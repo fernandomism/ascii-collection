@@ -7,27 +7,35 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&display=swap" rel="stylesheet" />
     <style>
-      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-      canvas { display: block; width: 100vw; height: 100vh; font-family: "Geist Mono", ui-monospace, Menlo, monospace; }
+      /* One deliberate look: a black cell grid, like a terminal at night. */
+      :root {
+        --bg: #000; --ui: #7d8290; --ui-dim: #5b606c; --ui-on: #f4f4f4;
+        --mono: "Geist Mono", ui-monospace, Menlo, monospace;
+        color-scheme: dark;
+      }
+      html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; font-family: var(--mono); }
       nav {
-        position: fixed; top: 12px; left: 16px; right: 16px;
+        position: fixed;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        left: max(16px, env(safe-area-inset-left, 0px));
+        right: max(16px, env(safe-area-inset-right, 0px));
         display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
-        font: 600 13px/1.6 "Geist Mono", ui-monospace, Menlo, monospace; color: #7d8290;
+        font: 600 13px/1.6 var(--mono); color: var(--ui);
         pointer-events: none; /* clicks between the controls reach the bugs */
       }
       nav a, nav button { pointer-events: auto; color: inherit; text-decoration: none; background: none; border: 0; padding: 2px 0; font: inherit; cursor: pointer; }
-      nav a:hover, nav button:hover { color: #fff; }
-      nav a[aria-current="page"], nav button[aria-pressed="true"] { color: #f4f4f4; }
-      nav a:focus-visible, nav button:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
-      #hint { color: #5b606c; }
+      nav a:hover, nav button:hover, nav a[aria-current="page"], nav button[aria-pressed="true"] { color: var(--ui-on); }
+      nav a:focus-visible, nav button:focus-visible { outline: 1px solid var(--ui-on); outline-offset: 2px; }
+      #hint { color: var(--ui-dim); }
     </style>
   </head>
   <body>
     <canvas aria-hidden="true"></canvas>
     <nav aria-label="Bugs">
-      <a href="?bug=moths">[moths]</a>
-      <a href="?bug=beetles">[beetles]</a>
-      <a href="?bug=ants">[ants]</a>
+      <a href="#moths">[moths]</a>
+      <a href="#beetles">[beetles]</a>
+      <a href="#ants">[ants]</a>
       <span id="modes" role="group" aria-label="Moth mode" hidden>
         <button type="button" data-mode="fly" aria-pressed="false">fly</button> /
         <button type="button" data-mode="crawl" aria-pressed="false">crawl</button>
