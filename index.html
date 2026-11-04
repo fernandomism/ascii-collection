@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ascii bugs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@600&display=swap" rel="stylesheet" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+      canvas { display: block; width: 100vw; height: 100vh; font-family: "Geist Mono", ui-monospace, Menlo, monospace; }
+      nav {
+        position: fixed; top: 12px; left: 16px; right: 16px;
+        display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
+        font: 600 13px/1.6 "Geist Mono", ui-monospace, Menlo, monospace; color: #7d8290;
+        pointer-events: none; /* clicks between the controls reach the bugs */
+      }
+      nav a, nav button { pointer-events: auto; color: inherit; text-decoration: none; background: none; border: 0; padding: 2px 0; font: inherit; cursor: pointer; }
+      nav a:hover, nav button:hover { color: #fff; }
+      nav a[aria-current="page"], nav button[aria-pressed="true"] { color: #f4f4f4; }
+      nav a:focus-visible, nav button:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+      #hint { color: #5b606c; }
+    </style>
+  </head>
+  <body>
+    <canvas aria-hidden="true"></canvas>
+    <nav aria-label="Bugs">
+      <a href="?bug=moths">[moths]</a>
+      <a href="?bug=beetles">[beetles]</a>
+      <a href="?bug=ants">[ants]</a>
+      <span id="modes" role="group" aria-label="Moth mode" hidden>
+        <button type="button" data-mode="fly" aria-pressed="false">fly</button> /
+        <button type="button" data-mode="crawl" aria-pressed="false">crawl</button>
+      </span>
+      <span id="hint" aria-live="off"></span>
+    </nav>
+    <script type="module" src="/demo.ts"></script>
+  </body>
+</html>
