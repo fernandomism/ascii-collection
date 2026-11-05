@@ -34,17 +34,18 @@ the edges, and now and then leave the scene altogether and come back in somewher
 - **moths** (`#moths`): atlas, luna, polyphemus, death's-head hawkmoth and rosy maple
   moths. The **fly / crawl** switch has them either fly with beating wings or land, fold
   their wings and walk in short bursts on six legs, now and then fluttering off to land
-  somewhere else. **lamp** and **cursor light** switch the two lights on and off: with the
-  lamp on, flying moths circle it (click to move it); with no light they roam in and out
-  of the scene. Clicking a perched moth makes it flash its wings open to show its eyespots.
+  somewhere else. **lamp** and **cursor light** switch the two lights on and off: flying
+  moths circle the nearest one (click to move the lamp; the cursor light is a second lamp
+  that follows your mouse), and with no light they roam in and out of the scene. Clicking a perched moth makes it flash its wings open to show its eyespots.
 - **beetles** (`#beetles`): flower chafer, goliath, stag, rhinoceros, hercules, jewel
-  beetle and ladybird. Horned males seek each other out and lock horns until one backs
-  off. Click a beetle to startle it: the wing cases lift, the hindwings unfold and it
+  beetle and ladybird. Like the sharks, they never stop: each walks its own lazy loop
+  round the scene, wide enough to carry it out past the edges and back. Horned males that
+  meet lock horns until one gives up and storms off. Click a beetle to startle it: the wing cases lift, the hindwings unfold and it
   flies off.
-- **ants** (`#ants`): big, detailed ants (mandibles, elbowed antennae, a segmented
+- **ants** (`#ants`): a colony of detailed ants (mandibles, elbowed antennae, a segmented
   gaster, six legs in a tripod gait). Click to drop food. Foragers smell it, bite off
   crumbs, carry them straight home and lay a pheromone trail that others follow. Ants
-  that meet stop to touch antennae, and every 5 crumbs stored hatch another ant. With no
+  that meet stop to touch antennae, and every 3 crumbs stored hatch another ant. With no
   food about, foragers set off out of the scene and later walk back in to the nest.
 
 ```sh

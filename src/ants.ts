@@ -21,7 +21,7 @@ const LEG: RGB = [176, 98, 62];
 const EYE: RGB = [18, 14, 14];
 const TRAIL: RGB = [200, 140, 64];
 const FOODS: RGB[] = [[240, 232, 210], [214, 168, 96], [238, 198, 72], [216, 74, 60], [150, 200, 90]];
-const CRUMBS_PER_ANT = 5;
+const CRUMBS_PER_ANT = 3;
 
 // Per leg pair (front, middle, hind): hip x, rest angle, femur/tibia/tarsus lengths, bend at each joint.
 const LEGS = [
@@ -149,10 +149,10 @@ export class AntScene implements Scene {
       this.rows = rows;
       this.pher = new Float32Array(cols * rows);
     }
-    this.baseL = clamp(Math.min(width, height) * 0.24, 110, 240);
-    this.nest = { x: width / 2, y: height * 0.55, r: this.baseL * 0.22 };
+    this.baseL = clamp(Math.min(width, height) * 0.14, 70, 140);
+    this.nest = { x: width / 2, y: height * 0.55, r: clamp(Math.min(width, height) * 0.06, 36, 64) };
     if (first) {
-      const n = clamp(Math.round((width * height) / (this.baseL ** 2 * 4)), 3, 6);
+      const n = clamp(Math.round((width * height) / (this.baseL ** 2 * 4.5)), 10, 24);
       for (let i = 0; i < n; i++) this.spawn(i === 0);
     }
   }
@@ -164,11 +164,11 @@ export class AntScene implements Scene {
   click(x: number, y: number) {
     for (const f of this.foods) {
       if (Math.hypot(f.x - x, f.y - y) < this.foodR(f) + 10) {
-        f.amount = Math.min(40, f.amount + 8);
+        f.amount = Math.min(60, f.amount + 12);
         return;
       }
     }
-    this.foods.push({ x, y, amount: 8, rgb: FOODS[Math.floor(Math.random() * FOODS.length)] });
+    this.foods.push({ x, y, amount: 12, rgb: FOODS[Math.floor(Math.random() * FOODS.length)] });
   }
 
   step(dt: number) {
@@ -218,7 +218,7 @@ export class AntScene implements Scene {
   }
 
   private cap() {
-    return clamp(Math.round((this.W * this.H) / (this.baseL ** 2 * 1.6)), 5, 14);
+    return clamp(Math.round((this.W * this.H) / (this.baseL ** 2 * 1.6)), 16, 48);
   }
 
   private foodR(f: Food) {
@@ -234,7 +234,7 @@ export class AntScene implements Scene {
       y: nest.y + Math.sin(a) * nest.r,
       heading: a,
       speed: 0,
-      L: this.baseL * (major ? 1.12 : rand(0.78, 0.95)),
+      L: this.baseL * (major ? 1.25 : rand(0.8, 1)),
       major,
       state: "explore",
       target: null,
@@ -405,8 +405,8 @@ export class AntScene implements Scene {
           a.y + Math.sin(a.heading) * a.L * 0.35 - b.y - Math.sin(b.heading) * b.L * 0.35,
         );
         if (head < (a.L + b.L) * 0.18 && time > a.greetAt && time > b.greetAt) {
-          a.pauseUntil = b.pauseUntil = time + rand(0.6, 1);
-          a.greetAt = b.greetAt = time + rand(6, 10);
+          a.pauseUntil = b.pauseUntil = time + rand(0.4, 0.7);
+          a.greetAt = b.greetAt = time + rand(8, 14);
         }
       }
     }

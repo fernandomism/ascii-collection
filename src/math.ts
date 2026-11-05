@@ -50,6 +50,20 @@ export function edgePull(x: number, y: number, W: number, H: number, L: number):
   return [((W / 2 - x) / d) * w, ((H / 2 - y) / d) * w];
 }
 
+/**
+ * The sharks' patrol: a lazy loop round the middle of the screen (squashed to its
+ * aspect) at the given radius, clockwise or not. Loops bigger than the screen carry
+ * the bug out of the frame and back. Returns a steering vector: the tangent plus a
+ * pull back onto the loop.
+ */
+export function patrol(x: number, y: number, W: number, H: number, radius: number, dir: 1 | -1): [number, number] {
+  const rx = (x - W / 2) / (W / Math.min(W, H));
+  const ry = y - H / 2;
+  const r = Math.hypot(rx, ry) || 1;
+  const radial = clamp((radius - r) / radius, -1, 1);
+  return [(-ry / r) * dir + (rx / r) * radial * 0.9, (rx / r) * dir + (ry / r) * radial * 0.9];
+}
+
 /** A point `out` px beyond a random edge of the screen. */
 export function beyondEdge(W: number, H: number, out: number): [number, number] {
   const t = rand(0.1, 0.9);
@@ -65,10 +79,10 @@ export function beyondEdge(W: number, H: number, out: number): [number, number] 
  * of sight comes back in past another edge, heading into the scene.
  * Returns true when it re-entered.
  */
-export function reenter(b: { x: number; y: number; heading: number; L: number }, W: number, H: number) {
-  if (outside(b.x, b.y, W, H) < b.L) return false;
+export function reenter(b: { x: number; y: number; heading: number; L: number }, W: number, H: number, at = 1) {
+  if (outside(b.x, b.y, W, H) < b.L * at) return false;
   // Just inside the trigger distance, so it can't bounce straight back out.
-  [b.x, b.y] = beyondEdge(W, H, b.L * 0.95);
+  [b.x, b.y] = beyondEdge(W, H, b.L * (at - 0.05));
   b.heading = Math.atan2(rand(0.25, 0.75) * H - b.y, rand(0.25, 0.75) * W - b.x);
   return true;
 }

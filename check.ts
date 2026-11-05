@@ -39,7 +39,7 @@ const colony = ants.ants.length;
 ants.click(W / 2 + 250, H / 2);
 ants.click(W / 2 - 250, H / 2);
 run(ants, 90, track(ants.ants));
-ok(ants.foods.reduce((n, f) => n + f.amount, 0) < 16, "ants carried food away");
+ok(ants.foods.reduce((n, f) => n + f.amount, 0) < 24, "ants carried food away");
 ok(ants.ants.length > colony, "colony grew from stored food");
 run(ants, 90, track(ants.ants));
 ok(returns > 0, "ants left the scene and came back");

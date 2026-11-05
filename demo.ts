@@ -43,7 +43,13 @@ function setLights() {
     b.textContent = `[${on ? "x" : " "}] ${b.dataset.light === "lamp" ? "lamp" : "cursor light"}`;
   }
   hint.textContent =
-    moths.mode === "crawl" ? "click a moth to startle it" : lit.lamp ? "click to move the lamp" : "no lamp: the moths roam";
+    moths.mode === "crawl"
+      ? "click a moth to startle it"
+      : lit.lamp
+        ? "click to move the lamp"
+        : lit.cursor
+          ? "your cursor is the lamp"
+          : "no light: the moths roam";
   engine?.refresh();
 }
 

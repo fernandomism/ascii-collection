@@ -9,7 +9,7 @@
  */
 import { dotted, limb, mix, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { beyondEdge, clamp, edgePull, hash3, rand, reenter, smoothstep, steer, TAU } from "./math";
+import { beyondEdge, clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "./math";
 import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "./render";
 
 export type BeetleKind = "flower" | "goliath" | "stag" | "rhino" | "hercules" | "jewel" | "ladybug";
@@ -49,8 +49,9 @@ interface Beetle {
   gait: number;
   wander: number;
   feel: number;
-  walkUntil: number;
-  pauseUntil: number;
+  /** Its patrol loop round the scene (px) and which way round it walks. */
+  orbitR: number;
+  orbitDir: 1 | -1;
   /** Elytra 0 shut → 1 raised; lift 0 grounded → 1 airborne. */
   open: number;
   lift: number;
@@ -61,9 +62,8 @@ interface Beetle {
   fleeUntil: number;
   /** No new fights before this. */
   calmAt: number;
-  /** A walk out past the edge of the screen, and when to start the next one. */
+  /** Set when it storms off out of the scene after losing a fight. */
   trip: [number, number] | null;
-  tripAt: number;
 }
 
 const BLACK: RGB = [34, 30, 30];
@@ -292,11 +292,17 @@ export class BeetleScene implements Scene {
       const b: Beetle = {
         id: i + 1, kind, look, x, y, heading: rand(0, TAU), speed: 0, L,
         gait: rand(0, TAU), wander: 0, feel: rand(0, TAU),
-        walkUntil: rand(2, 6), pauseUntil: 0, open: 0, lift: 0, flap: 0, flyUntil: 0,
-        rival: null, sparUntil: 0, fleeUntil: 0, calmAt: rand(4, 10), trip: null, tripAt: rand(10, 40),
+        orbitR: 0, orbitDir: i % 2 ? -1 : 1, open: 0, lift: 0, flap: 0, flyUntil: 0,
+        rival: null, sparUntil: 0, fleeUntil: 0, calmAt: rand(4, 10), trip: null,
       };
+      b.orbitR = this.pickOrbit();
       this.beetles.push(b);
     });
+  }
+
+  /** Loops from well inside the scene to well beyond its edges. */
+  private pickOrbit() {
+    return rand(0.25, 0.62) * Math.min(this.W, this.H);
   }
 
   click(x: number, y: number) {
@@ -329,8 +335,8 @@ export class BeetleScene implements Scene {
 
       let dx = Math.cos(b.heading);
       let dy = Math.sin(b.heading);
-      let target = 0;
-      let turn = 1.6;
+      let target: number;
+      let turn: number;
       if (b.lift > 0.05 || flying) {
         // Airborne: a clumsy, wobbling beeline.
         b.wander = clamp(b.wander + (Math.random() - 0.5) * dt * 6, -0.6, 0.6);
@@ -347,53 +353,65 @@ export class BeetleScene implements Scene {
         target = L * 0.12 * Math.sin(time * 4.5 + (b.id % 2) * Math.PI);
         turn = 2;
         if (time > b.sparUntil && b.id < o.id) {
+          // The loser storms off out of the scene.
           const loser = Math.random() < 0.5 ? b : o;
-          loser.heading += Math.PI + rand(-0.4, 0.4);
-          loser.fleeUntil = time + 2.5;
+          loser.trip = beyondEdge(W, H, loser.L * 2.5);
+          loser.fleeUntil = time + 4;
           b.rival = o.rival = null;
           b.calmAt = o.calmAt = time + rand(10, 16);
         }
       } else {
-        if (time > b.walkUntil) {
-          b.pauseUntil = time + rand(0.8, 2.5);
-          b.walkUntil = b.pauseUntil + rand(3, 8);
-        }
-        const fleeing = time < b.fleeUntil;
-        b.wander = clamp(b.wander + (Math.random() - 0.5) * dt * 2.5, -0.7, 0.7);
-        dx += Math.cos(b.heading + b.wander) * 0.5;
-        dy += Math.sin(b.heading + b.wander) * 0.5;
-        if (!b.trip && time > b.tripAt) b.trip = beyondEdge(W, H, L * 1.5);
+        // Like the sharks: always on the move, a drifting wander on top of a lazy
+        // loop round the scene that carries it out past the edges and back.
+        b.wander = clamp(b.wander + (Math.random() - 0.5) * dt * 3, -1.1, 1.1);
+        dx += Math.cos(b.heading + b.wander) * 0.45;
+        dy += Math.sin(b.heading + b.wander) * 0.45;
         if (b.trip) {
           const d = Math.hypot(b.trip[0] - b.x, b.trip[1] - b.y) || 1;
           dx += ((b.trip[0] - b.x) / d) * 2;
           dy += ((b.trip[1] - b.y) / d) * 2;
-        } else if (b.look.fighter && time > b.calmAt && !fleeing) {
-          // Seek out another calm fighter nearby.
-          for (const o of this.beetles) {
-            if (o === b || !o.look.fighter || o.rival || o.lift > 0 || time < o.calmAt) continue;
-            const d = Math.hypot(o.x - b.x, o.y - b.y) || 1;
-            if (d < L * 3) {
-              dx += ((o.x - b.x) / d) * 1.2;
-              dy += ((o.y - b.y) / d) * 1.2;
+        } else {
+          const radius = b.orbitR * (1 + 0.15 * Math.sin(time * 0.05 + b.id));
+          const [px, py] = patrol(b.x, b.y, W, H, radius, b.orbitDir);
+          dx += px * 0.55;
+          dy += py * 0.55;
+          if (Math.random() < dt / 40) b.orbitR = this.pickOrbit();
+        }
+        const fighting = b.look.fighter && time > b.calmAt;
+        for (const o of this.beetles) {
+          if (o === b || o.lift > 0.05) continue;
+          const ox = o.x - b.x;
+          const oy = o.y - b.y;
+          const d = Math.hypot(ox, oy) || 1;
+          const ahead = (Math.cos(b.heading) * ox + Math.sin(b.heading) * oy) / d;
+          if (fighting && o.look.fighter && time > o.calmAt && !o.rival) {
+            // A calm male squares up to another one it sees ahead.
+            if (d < L * 3 && ahead > 0.3) {
+              dx += (ox / d) * 0.9;
+              dy += (oy / d) * 0.9;
+            }
+          } else {
+            // Everyone else gives way, like the sharks.
+            const range = (L + o.L) * 0.45;
+            if (d < range) {
+              dx -= (ox / d) * (1 - d / range) * 3;
+              dy -= (oy / d) * (1 - d / range) * 3;
             }
           }
         }
-        target = time < b.pauseUntil && !fleeing ? 0 : b.look.speed * L * (fleeing ? 2.2 : 1);
+        target = b.look.speed * L * (time < b.fleeUntil ? 2.2 : 1) * (0.85 + 0.15 * Math.sin(time * 0.7 + b.id));
+        // Turning circle grows with speed, so it walks arcs instead of spinning on the spot.
+        turn = Math.min(1.2, Math.abs(b.speed) / (L * 0.35));
       }
 
-      if (!b.trip && b.lift === 0) {
-        const [ex, ey] = edgePull(b.x, b.y, W, H, L);
-        dx += ex;
-        dy += ey;
-      }
       b.heading = steer(b.heading, Math.atan2(dy, dx), turn * dt);
       b.speed += (target - b.speed) * Math.min(1, dt * 3);
       b.x += Math.cos(b.heading) * b.speed * dt;
       b.y += Math.sin(b.heading) * b.speed * dt;
       b.gait += ((Math.abs(b.speed) * dt) / (L * 0.28)) * Math.PI * (b.lift > 0.1 ? 0 : 1);
-      if (reenter(b, W, H)) {
+      if (reenter(b, W, H, 1.8)) {
         b.trip = null;
-        b.tripAt = time + rand(35, 70);
+        b.orbitR = this.pickOrbit();
       }
     }
     this.collide();
