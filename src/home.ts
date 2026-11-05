@@ -40,7 +40,7 @@ const VERSIONS: Version[] = [
   { id: "leaves", section: "nature", title: "falling leaves", scene: "leaves", about: "Maple, oak, birch and ginkgo leaves tumbling down in autumn colours." },
   {
     id: "pond", section: "nature", title: "koi pond", scene: "pond",
-    about: "A koi pond seen from a second-floor window: pink water lilies, red and blue dragonflies, small fish deep below. Click to feed the koi.",
+    about: "A koi pond seen from a second-floor window: pink water lilies, red and blue dragonflies, a faint reflection drifting by. Click to feed the koi.",
   },
 ];
 

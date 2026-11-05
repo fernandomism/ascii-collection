@@ -46,7 +46,7 @@ The grey versions use the sharks' blue-grey with flickering rainbow glyphs.
 | Page | |
 | --- | --- |
 | `nature/leaves.html` | Maple, oak, birch and ginkgo leaves tumbling down an autumn grid. |
-| `nature/pond.html` | A koi pond seen from a second-floor window. Click the water to ripple it and feed the koi. Sakura petals drift down now and then, lily pads carry pink water lilies, small fish swim deep below, a few flies wander and red and blue dragonflies come by. |
+| `nature/pond.html` | A koi pond seen from a second-floor window. Click the water to ripple it and feed the koi. Sakura petals drift down now and then, lily pads carry pink water lilies, a faint reflection drifts across the water, a few flies wander and red and blue dragonflies come by. |
 
 ## Use
 

@@ -6,8 +6,9 @@
  *
  * Click the water: it ripples and you scatter food, which the koi come up to eat.
  * Now and then a sakura petal drifts down, ripples the surface where it lands,
- * floats a while and sinks. Lily pads float on top, faint schools of small fish
- * swim far below, a few flies wander about and red and blue dragonflies come by now and then.
+ * floats a while and sinks. Lily pads with pink water lilies float on top, a faint
+ * reflection drifts across the water, a few flies wander about and red and blue
+ * dragonflies come by now and then.
  */
 import { mix, SIDES } from "../core/anatomy";
 import type { Scene } from "../core/engine";
@@ -86,32 +87,9 @@ const LILY_INNER: RGB = [252, 196, 220];
 const LILY_HEART: RGB = [250, 210, 90];
 const RED_DRAGONFLY: RGB = [214, 54, 40];
 const BLUE_DRAGONFLY: RGB = [60, 112, 226];
-/** Fish deep below: dark, close to the background. */
-const DEEP_FISH_RGB: RGB = [84, 128, 142];
-const FIN = [0.02, 0, -0.02, 0.14, -0.1, 0.2, -0.08, 0.08, -0.03, 0];
 const FOOD: RGB = [214, 168, 104];
 const DEEP_WATER: RGB = [10, 34, 42];
 
-/** Loose groups of small fish far below the koi. */
-const DEEP_FISH: FlockStyle = {
-  glyphs: "-~", ink: [0, 0, 0], groups: 3, size: [5, 9], cruise: 40, maxSpeed: 70, jitter: 120, beat: 6, shy: false, spacing: 45,
-};
-
-/** A small shark-shaped fish seen from above: pointed snout, swept fins, a darker ridge and a forked tail that sways. */
-function deepFishFigure(phase: number, rgb: RGB): Figure {
-  const ridge: RGB = [rgb[0] * 0.65, rgb[1] * 0.65, rgb[2] * 0.65];
-  const parts: Part[] = [];
-  const a = 0.5 * Math.sin(phase);
-  const bx = -0.32;
-  const by = 0.04 * Math.sin(phase + 1);
-  for (const side of SIDES) {
-    parts.push({ k: "seg", x0: bx, y0: by, x1: bx - 0.18 * Math.cos(a) - side * 0.09 * Math.sin(a), y1: by - 0.18 * Math.sin(a) + side * 0.09 * Math.cos(a), r0: 0.035, r1: 0.01, paint: ridge });
-    parts.push({ k: "wing", poly: FIN, x: 0.1, side, sweep: 0.5, flap: 1, paint: ridge });
-  }
-  parts.push({ k: "ell", x: 0.02, y: 0, rx: 0.34, ry: 0.075, paint: (u, v) => (Math.abs(v) < 0.25 && u > -0.6 && u < 0.5 ? ridge : rgb), gloss: 0.3 });
-  parts.push({ k: "seg", x0: 0.28, y0: 0, x1: 0.42, y1: 0, r0: 0.05, r1: 0.01, paint: rgb });
-  return { parts, strokes: [] };
-}
 /** A few lone flies about the water at all times. */
 const FLIES: FlockStyle = {
   glyphs: "+x", ink: [230, 238, 220], groups: 6, size: [1, 1], cruise: 80, maxSpeed: 200, jitter: 700, beat: 40, shy: true,
@@ -173,15 +151,15 @@ export class PondScene implements Scene {
   petals: Petal[] = [];
   food: Pellet[] = [];
   ripples: Ripple[] = [];
-  deep = new Flock(DEEP_FISH);
   flies = new Flock(FLIES);
   dragonflies: Dragonfly[] = [];
   /** Where the koi swim: the stretch of the pond in view at the near edge, from a little past the far edge. */
   private koiArea: Area = { x: 0, y: 0, w: 0, h: 0 };
-  /** Where the deep fish swim (their flock works from 0, so this is its offset on the pond): the water in view. */
-  private deepArea: Area = { x: 0, y: 0, w: 0, h: 0 };
   private cw = 12;
   private ch = 17;
+  /** Every cell's spot on the water (u, v), for the drifting reflection. */
+  private cells = new Float32Array(0);
+  private cols = 0;
   private nextPetal = 0;
   private nextId = 1;
 
@@ -189,9 +167,16 @@ export class PondScene implements Scene {
     const first = this.view.W === 0;
     this.view.set(width, height);
     this.koiArea = { x: this.view.Wp / 2 - width / 2, y: this.view.D * 0.15, w: width, h: this.view.D * 0.85 };
-    this.deepArea = { x: this.view.Wp / 2 - width * 0.45, y: this.view.D * 0.3, w: width * 0.9, h: this.view.D * 0.6 };
     this.cw = cw;
     this.ch = ch;
+    this.cols = Math.ceil(width / cw);
+    const rows = Math.ceil(height / ch);
+    this.cells = new Float32Array(this.cols * rows * 2);
+    for (let i = 0; i < this.cols * rows; i++) {
+      const [u, v] = this.view.unproject(((i % this.cols) + 0.5) * cw, (((i / this.cols) | 0) + 0.5) * ch);
+      this.cells[i * 2] = u;
+      this.cells[i * 2 + 1] = v;
+    }
     if (!first) return;
     const minSide = Math.min(width, height);
     // Somewhere on the water that's on screen.
@@ -213,7 +198,6 @@ export class PondScene implements Scene {
       this.pads.push({ id: this.nextId++, x, y, L, angle: rand(0, TAU), flower: Math.random() < 0.6 });
     }
     for (let i = 0; i < 3; i++) this.dropPetal(true);
-    this.deep.seed(this.deepArea.w, this.deepArea.h);
     this.flies.seed(width, height);
     this.dragonflies = [new Dragonfly(minSide * 0.17, rand(2, 6), RED_DRAGONFLY), new Dragonfly(minSide * 0.15, rand(9, 15), BLUE_DRAGONFLY)];
   }
@@ -288,23 +272,26 @@ export class PondScene implements Scene {
     }
     this.petals = this.petals.filter((p) => p.sink < 1);
     this.ripples = this.ripples.filter((r) => time - r.born < 1.6 + 1.8 * r.strength);
-    this.deep.step(dt, this.deepArea.w, this.deepArea.h, time);
     this.flies.step(dt, W, H, time, this.pointer);
     for (const d of this.dragonflies) d.step(dt, time, Wp, D);
   }
 
   draw(r: Renderer) {
     const { cw, ch, time: t, view } = this;
-    // Deepest first: the small fish far below, darker the farther off they are.
-    let id = 3000;
-    const minSide = Math.min(view.W, view.H);
-    for (const g of this.deep.groups) {
-      for (const m of g.members) {
-        const [x, y, s, q] = view.project(m.x + this.deepArea.x, m.y + this.deepArea.y);
-        const k = 0.5 + 0.5 * s;
-        const fig = deepFishFigure(m.phase, [DEEP_FISH_RGB[0] * k, DEEP_FISH_RGB[1] * k, DEEP_FISH_RGB[2] * k]);
-        r.bug(fig, { x, y, heading: Math.atan2(m.vy, m.vx), L: minSide * 0.15 * (0.7 + 0.3 * m.depth) * s, id: id++, squash: q });
-      }
+    // A faint reflection of the sky drifting slowly across the water: sparse glints in a soft
+    // diagonal band, under everything else.
+    const band = ((t * 0.03) % 1.4) - 0.2;
+    const { cells } = this;
+    const { Wp, D } = view;
+    for (let i = 0; i < cells.length / 2; i++) {
+      const u = cells[i * 2];
+      const v = cells[i * 2 + 1];
+      const off = Math.abs((u / Wp + v / D) / 2 - band);
+      if (off > 0.12) continue;
+      const glint = Math.sin(u * 0.04 + t * 1.5) * Math.sin(v * 0.05 - t * 1.1);
+      if (glint < 0.35) continue;
+      const k = (1 - off / 0.12) ** 2 * glint;
+      r.putCell(i % this.cols, (i / this.cols) | 0, glint > 0.7 ? "~" : "-", [28 + 46 * k, 62 + 70 * k, 72 + 74 * k]);
     }
 
     this.koi.sort((a, b) => a.y - b.y);
