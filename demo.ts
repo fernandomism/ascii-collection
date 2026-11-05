@@ -9,9 +9,18 @@ const hint = document.getElementById("hint")!;
 const modes = document.getElementById("modes")!;
 const modeButtons = modes.querySelectorAll<HTMLButtonElement>("button");
 
+const lookButtons = document.querySelectorAll<HTMLButtonElement>("#looks button");
+
 let engine: BugEngine | undefined;
 let moths: MothScene | undefined;
 let ticker = 0;
+let grey = false;
+
+function setLook(on: boolean) {
+  grey = on;
+  for (const b of lookButtons) b.setAttribute("aria-pressed", String((b.dataset.look === "grey") === on));
+  engine?.setGrey(on);
+}
 
 function setMode(mode: MothMode) {
   if (!moths) return;
@@ -46,9 +55,11 @@ function show() {
   }
   modes.hidden = !moths;
   engine = new BugEngine(canvas, scene);
+  if (grey) engine.setGrey(true);
   if (moths) setMode(moths.mode);
 }
 
 for (const b of modeButtons) b.addEventListener("click", () => setMode(b.dataset.mode as MothMode));
+for (const b of lookButtons) b.addEventListener("click", () => setLook(b.dataset.look === "grey"));
 window.addEventListener("hashchange", show);
 show();

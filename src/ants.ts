@@ -9,7 +9,7 @@
  */
 import { limb, mix, scale, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, hash3, rand, steer, TAU } from "./math";
+import { clamp, edgePull, hash3, rand, steer, TAU } from "./math";
 import type { Figure, Part, Renderer, RGB, Stroke } from "./render";
 
 const HEAD: RGB = [198, 86, 46];
@@ -151,10 +151,6 @@ export class AntScene implements Scene {
     if (first) {
       const n = clamp(Math.round((width * height) / (this.baseL ** 2 * 4)), 3, 6);
       for (let i = 0; i < n; i++) this.spawn(i === 0);
-    }
-    for (const a of this.ants) {
-      a.x = clamp(a.x, 0, width);
-      a.y = clamp(a.y, 0, height);
     }
   }
 
@@ -353,18 +349,15 @@ export class AntScene implements Scene {
       }
     }
 
-    // Soft walls.
-    const m = L * 0.35;
-    if (a.x < m) dx += ((m - a.x) / m) * 3;
-    else if (a.x > this.W - m) dx -= ((a.x - (this.W - m)) / m) * 3;
-    if (a.y < m) dy += ((m - a.y) / m) * 3;
-    else if (a.y > this.H - m) dy -= ((a.y - (this.H - m)) / m) * 3;
+    const [ex, ey] = edgePull(a.x, a.y, this.W, this.H, L);
+    dx += ex;
+    dy += ey;
 
     a.heading = steer(a.heading, Math.atan2(dy, dx), 2.8 * dt);
     const cruise = (52 + L * 0.18) * (a.carry ? 0.85 : 1);
     a.speed += (cruise - a.speed) * Math.min(1, dt * 3);
-    a.x = clamp(a.x + Math.cos(a.heading) * a.speed * dt, -L * 0.2, this.W + L * 0.2);
-    a.y = clamp(a.y + Math.sin(a.heading) * a.speed * dt, -L * 0.2, this.H + L * 0.2);
+    a.x += Math.cos(a.heading) * a.speed * dt;
+    a.y += Math.sin(a.heading) * a.speed * dt;
     a.gait += ((a.speed * dt) / (L * 0.3)) * Math.PI;
   }
 

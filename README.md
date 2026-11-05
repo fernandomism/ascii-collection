@@ -27,7 +27,8 @@
 
 Insects drawn as ASCII on a canvas, in the style of
 [ascii-sharks](https://github.com/stackedlol/ascii-sharks). Zero runtime dependencies.
-Three versions:
+Three versions, each in colour or in the sharks' grey (the **color / grey** switch at the top).
+Like the sharks, the bugs aren't fenced in: they wander off the edges of the screen and come back.
 
 - **moths** (`#moths`): atlas, luna, polyphemus, death's-head hawkmoth and rosy maple
   moths around a lamp. The **fly / crawl** switch has them either circle the light with
@@ -60,8 +61,8 @@ const engine = new BugEngine(canvas, new AntScene());
 ```
 
 `npm run typecheck` checks types. `npm run check` runs the three simulations headless and
-checks that ants forage and the colony grows, beetles fight, fly and land, and moths
-circle the lamp, land and flash their wings.
+checks that ants forage and the colony grows, beetles fight, fly and land, moths
+circle the lamp, land and flash their wings, and that bugs that wander off-screen come back.
 
 Respects `prefers-reduced-motion` (it draws a single still frame) and pauses when off-screen.
 

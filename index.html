@@ -22,6 +22,7 @@
         right: max(16px, env(safe-area-inset-right, 0px));
         display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline;
         font: 600 13px/1.6 var(--mono); color: var(--ui);
+        text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg), 0 0 9px var(--bg); /* legible over bugs passing underneath */
         pointer-events: none; /* clicks between the controls reach the bugs */
       }
       nav a, nav button { pointer-events: auto; color: inherit; text-decoration: none; background: none; border: 0; padding: 2px 0; font: inherit; cursor: pointer; }
@@ -36,6 +37,10 @@
       <a href="#moths">[moths]</a>
       <a href="#beetles">[beetles]</a>
       <a href="#ants">[ants]</a>
+      <span id="looks" role="group" aria-label="Colour">
+        <button type="button" data-look="color" aria-pressed="true">color</button> /
+        <button type="button" data-look="grey" aria-pressed="false">grey</button>
+      </span>
       <span id="modes" role="group" aria-label="Moth mode" hidden>
         <button type="button" data-mode="fly" aria-pressed="false">fly</button> /
         <button type="button" data-mode="crawl" aria-pressed="false">crawl</button>

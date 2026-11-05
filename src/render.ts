@@ -121,6 +121,7 @@ export class Renderer {
   private glyph = new Uint16Array(0);
   private shadow = new Uint8Array(0);
   private styles = new Map<number, string>();
+  private grey = false;
   // The bug being rasterised: its parts, their bounds (cx, cy, r, cos, sin) and the light in body space.
   private parts: Part[] = [];
   private box = new Float32Array(64);
@@ -469,10 +470,22 @@ export class Renderer {
     g.textBaseline = "middle";
   }
 
+  /** Draw everything in the sharks' cool blue-grey instead of colour. Repaint the ground after. */
+  setGrey(on: boolean) {
+    this.grey = on;
+    this.styles.clear();
+  }
+
   private style(p: number) {
     let s = this.styles.get(p);
     if (!s) {
-      s = "#" + p.toString(16).padStart(6, "0");
+      let q = p;
+      if (this.grey) {
+        // Lift the darks (brown ants would otherwise sink into the black), keep the lights.
+        const l = 255 * ((0.3 * (p >> 16) + 0.59 * ((p >> 8) & 255) + 0.11 * (p & 255)) / 255) ** 0.7;
+        q = pack(l * 0.94, l * 0.98, l * 1.05 + 4);
+      }
+      s = "#" + q.toString(16).padStart(6, "0");
       this.styles.set(p, s);
     }
     return s;

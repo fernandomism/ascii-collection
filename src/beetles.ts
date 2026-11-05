@@ -9,7 +9,7 @@
  */
 import { dotted, limb, mix, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, hash3, rand, smoothstep, steer, TAU } from "./math";
+import { clamp, edgePull, hash3, rand, smoothstep, steer, TAU } from "./math";
 import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "./render";
 
 export type BeetleKind = "flower" | "goliath" | "stag" | "rhino" | "hercules" | "jewel" | "ladybug";
@@ -269,10 +269,6 @@ export class BeetleScene implements Scene {
     this.W = width;
     this.H = height;
     if (first) this.seed();
-    for (const b of this.beetles) {
-      b.x = clamp(b.x, 0, width);
-      b.y = clamp(b.y, 0, height);
-    }
   }
 
   private seed() {
@@ -377,11 +373,9 @@ export class BeetleScene implements Scene {
         target = time < b.pauseUntil && !fleeing ? 0 : b.look.speed * L * (fleeing ? 2.2 : 1);
       }
 
-      const m = L * 0.45;
-      if (b.x < m) dx += ((m - b.x) / m) * 3;
-      else if (b.x > W - m) dx -= ((b.x - (W - m)) / m) * 3;
-      if (b.y < m) dy += ((m - b.y) / m) * 3;
-      else if (b.y > H - m) dy -= ((b.y - (H - m)) / m) * 3;
+      const [ex, ey] = edgePull(b.x, b.y, W, H, L);
+      dx += ex;
+      dy += ey;
 
       b.heading = steer(b.heading, Math.atan2(dy, dx), turn * dt);
       b.speed += (target - b.speed) * Math.min(1, dt * 3);

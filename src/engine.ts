@@ -73,6 +73,13 @@ export class BugEngine {
     window.removeEventListener("blur", this.onPointerLeave);
   }
 
+  /** Switch between colour and the sharks' grey. */
+  setGrey(on: boolean) {
+    this.renderer.setGrey(on);
+    this.renderer.paintGround(this.scene.ground?.bind(this.scene));
+    this.refresh();
+  }
+
   /** Redraw one frame now (e.g. after a setting changes under reduced motion). */
   refresh() {
     if (this.reducedMotion.matches) this.drawStill();

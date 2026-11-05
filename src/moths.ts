@@ -12,7 +12,7 @@
  */
 import { limb, mix, scale, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, hash3, rand, steer, TAU } from "./math";
+import { clamp, edgePull, hash3, rand, steer, TAU } from "./math";
 import { FUZZ, WING, type Figure, type Paint, type Part, type Renderer, type RGB, type Stroke } from "./render";
 
 export type MothKind = "luna" | "rosy" | "polyphemus" | "atlas" | "deathshead";
@@ -251,7 +251,11 @@ export class MothScene implements Scene {
   setMode(mode: MothMode) {
     if (mode === this.mode) return;
     this.mode = mode;
-    for (const m of this.moths) m.takeoffAt = this.time + rand(0, 1.5);
+    for (const m of this.moths) {
+      m.takeoffAt = this.time + rand(0, 1.5);
+      // Moths out on a wide swing come back in to land.
+      if (mode === "crawl") m.orbitR = Math.min(m.orbitR, 0.42 * Math.min(this.W, this.H) + m.L * 0.35);
+    }
   }
 
   private get lx() {
@@ -273,10 +277,6 @@ export class MothScene implements Scene {
     this.cw = cw;
     this.ch = ch;
     if (first) this.seed();
-    for (const m of this.moths) {
-      m.x = clamp(m.x, 0, width);
-      m.y = clamp(m.y, 0, height);
-    }
   }
 
   private seed() {
@@ -313,8 +313,11 @@ export class MothScene implements Scene {
   }
 
   private pickOrbit(m: Moth) {
-    // Mostly wide loops; sometimes a dive straight at the bulb.
-    return Math.random() < 0.2 ? m.L * 0.35 : rand(0.12, 0.42) * Math.min(this.W, this.H) + m.L * 0.35;
+    // Mostly loops round the lamp; sometimes a dive at the bulb, or a wide swing out past the edges.
+    const r = Math.random();
+    if (r < 0.2) return m.L * 0.35;
+    if (r < 0.35) return rand(0.6, 0.9) * Math.max(this.W, this.H);
+    return rand(0.12, 0.42) * Math.min(this.W, this.H) + m.L * 0.35;
   }
 
   click(x: number, y: number) {
@@ -338,7 +341,9 @@ export class MothScene implements Scene {
     this.time += dt;
     const fly = this.mode === "fly";
     for (const m of this.moths) {
-      const up = fly && this.time >= m.takeoffAt;
+      // A moth told to land keeps flying until it's back over the screen.
+      const away = m.x < 0 || m.y < 0 || m.x > this.W || m.y > this.H;
+      const up = fly ? this.time >= m.takeoffAt : away && m.lift > 0;
       m.lift = clamp(m.lift + (up ? dt * 1.2 : -dt * 0.7), 0, 1);
       m.flash = clamp(m.flash + (this.time < m.flashUntil ? dt * 6 : -dt * 3), 0, 1);
       m.flapPhase += dt * (m.lift > 0.01 ? 14 : 0);
@@ -395,8 +400,8 @@ export class MothScene implements Scene {
     if (Math.random() < dt * 0.1) m.orbitR = this.pickOrbit(m);
     const target = L * (0.85 + 0.35 * Math.sin(this.time * 1.3 + m.id * 2)) * m.lift;
     m.speed += (target - m.speed) * Math.min(1, dt * 2);
-    m.x = clamp(m.x + Math.cos(m.heading) * m.speed * dt, -L, this.W + L);
-    m.y = clamp(m.y + Math.sin(m.heading) * m.speed * dt, -L, this.H + L);
+    m.x += Math.cos(m.heading) * m.speed * dt;
+    m.y += Math.sin(m.heading) * m.speed * dt;
   }
 
   private crawlStep(m: Moth, dt: number) {
@@ -412,11 +417,9 @@ export class MothScene implements Scene {
     m.wander = clamp(m.wander + (Math.random() - 0.5) * dt * 2, -0.6, 0.6);
     let dx = Math.cos(m.heading + m.wander);
     let dy = Math.sin(m.heading + m.wander);
-    const mg = L * 0.4;
-    if (m.x < mg) dx += ((mg - m.x) / mg) * 3;
-    else if (m.x > W - mg) dx -= ((m.x - (W - mg)) / mg) * 3;
-    if (m.y < mg) dy += ((mg - m.y) / mg) * 3;
-    else if (m.y > H - mg) dy -= ((m.y - (H - mg)) / mg) * 3;
+    const [ex, ey] = edgePull(m.x, m.y, W, H, L);
+    dx += ex;
+    dy += ey;
     if (!resting) m.heading = steer(m.heading, Math.atan2(dy, dx), 1.2 * dt);
     const target = resting ? 0 : L * 0.07;
     m.speed += (target - m.speed) * Math.min(1, dt * (m.lift > 0 ? 1.5 : 4));
@@ -464,8 +467,8 @@ export class MothScene implements Scene {
         mo.vx *= Math.exp(-dt * 4);
         mo.vy *= Math.exp(-dt * 4);
       }
-      mo.x = clamp(mo.x + mo.vx * dt, 0, this.W);
-      mo.y = clamp(mo.y + mo.vy * dt, 0, this.H);
+      mo.x += mo.vx * dt;
+      mo.y += mo.vy * dt;
     }
   }
 
