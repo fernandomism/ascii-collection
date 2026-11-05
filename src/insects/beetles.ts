@@ -9,7 +9,7 @@
  */
 import { dotted, limb, mix, SIDES, tripod } from "../core/anatomy";
 import type { Scene } from "../core/engine";
-import { Gnats } from "./gnats";
+import { Flock, type FlockStyle } from "../core/flock";
 import { clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "../core/math";
 import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "../core/render";
 
@@ -59,6 +59,10 @@ interface Beetle {
 }
 
 const BLACK: RGB = [34, 30, 30];
+/** Swarms of gnats drifting over the leaf litter; + and x read apart from the litter's dots. */
+const GNATS: FlockStyle = {
+  glyphs: "+x", ink: [240, 244, 226], groups: 4, size: [12, 22], cruise: 70, maxSpeed: 170, jitter: 900, beat: 40, shy: true,
+};
 const GOLD_HAIR: RGB = [214, 160, 74];
 const MEMBRANE: RGB = [170, 150, 118];
 
@@ -251,7 +255,7 @@ export class BeetleScene implements Scene {
   time = 0;
   pointer = { x: 0, y: 0, active: false };
   beetles: Beetle[] = [];
-  gnats = new Gnats();
+  gnats = new Flock(GNATS);
   private W = 0;
   private H = 0;
   private cw = 10;

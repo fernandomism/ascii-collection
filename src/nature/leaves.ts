@@ -73,10 +73,11 @@ function leafPaint(kind: (typeof KINDS)[number], [centre, edge]: [RGB, RGB], k: 
 export class LeavesScene implements Scene {
   time = 0;
   pointer = { x: 0, y: 0, active: false };
-  backdrop: Backdrop = { bg: "#140c07", grid: "rgba(255,170,110,0.06)", big: true, shadows: false };
+  backdrop: Backdrop = { bg: "#000", grid: "rgba(255,255,255,0.055)", big: true, shadows: false };
   leaves: Leaf[] = [];
   private W = 0;
   private H = 0;
+  private nextId = 1;
 
   resize(width: number, height: number) {
     const first = this.W === 0;
@@ -84,32 +85,27 @@ export class LeavesScene implements Scene {
     this.H = height;
     if (!first) return;
     const n = clamp(Math.round((width * height) / 60000), 12, 36);
-    for (let i = 0; i < n; i++) {
-      const depth = rand(0.5, 1);
-      const kind = KINDS[Math.floor(Math.random() * KINDS.length)];
-      const colors = COLORS[Math.floor(Math.random() * COLORS.length)];
-      const k = 0.65 + 0.35 * depth;
-      this.leaves.push({
-        id: i + 1,
-        x: rand(0, width),
-        y: rand(-height * 0.3, height),
-        L: Math.min(width, height) * 0.24 * depth ** 1.5 * kind.size,
-        kind,
-        paint: leafPaint(kind, colors, k),
-        stem: scale(STEM, k),
-        depth,
-        phase: rand(0, TAU),
-        omega: rand(0.8, 1.6),
-        amp: rand(25, 70) * depth,
-        fall: 25 + 55 * depth,
-        angle: rand(0, TAU),
-        spin: rand(-0.4, 0.4),
-        flip: rand(0, TAU),
-        flipRate: rand(0.6, 2.2),
-      });
-    }
+    for (let i = 0; i < n; i++) this.leaves.push(this.makeLeaf(rand(0.5, 1), rand(0, width), rand(-height * 0.3, height)));
     // Far (small) leaves draw first so near ones pass in front.
     this.leaves.sort((a, b) => a.L - b.L);
+  }
+
+  private makeLeaf(depth: number, x: number, y: number, kind = KINDS[Math.floor(Math.random() * KINDS.length)], colors = COLORS[Math.floor(Math.random() * COLORS.length)]): Leaf {
+    const k = 0.65 + 0.35 * depth;
+    return {
+      id: this.nextId++, x, y, kind, depth,
+      L: Math.min(this.W, this.H) * 0.24 * depth ** 1.5 * kind.size,
+      paint: leafPaint(kind, colors, k),
+      stem: scale(STEM, k),
+      phase: rand(0, TAU),
+      omega: rand(1, 1.9),
+      amp: rand(30, 80) * depth,
+      fall: 40 + 80 * depth,
+      angle: rand(0, TAU),
+      spin: rand(-0.5, 0.5),
+      flip: rand(0, TAU),
+      flipRate: rand(0.8, 2.6),
+    };
   }
 
   step(dt: number) {
@@ -133,19 +129,23 @@ export class LeavesScene implements Scene {
     }
   }
 
+  private drawLeaf(r: Renderer, l: Leaf, x: number, y: number, L: number, flap: number, heading: number) {
+    const fig: Figure = {
+      parts: [
+        { k: "wing", poly: l.kind.poly, x: 0, side: 1, sweep: 0, flap, paint: l.paint, ramp: WING },
+        { k: "wing", poly: l.kind.poly, x: 0, side: -1, sweep: 0, flap, paint: l.paint, ramp: WING },
+      ],
+      strokes: [{ x0: l.kind.base, y0: 0, x1: l.kind.base - 0.2, y1: 0.03, rgb: l.stem }],
+    };
+    r.bug(fig, { x, y, heading, L, id: l.id });
+  }
+
   draw(r: Renderer) {
     for (const l of this.leaves) {
       // Turning over foreshortens the leaf across its width; never quite edge-on, so it doesn't blink out.
       const flap = Math.max(0.15, Math.abs(Math.cos(l.flip)));
-      const fig: Figure = {
-        parts: [
-          { k: "wing", poly: l.kind.poly, x: 0, side: 1, sweep: 0, flap, paint: l.paint, ramp: WING },
-          { k: "wing", poly: l.kind.poly, x: 0, side: -1, sweep: 0, flap, paint: l.paint, ramp: WING },
-        ],
-        strokes: [{ x0: l.kind.base, y0: 0, x1: l.kind.base - 0.2, y1: 0.03, rgb: l.stem }],
-      };
       // Rocks with the swing.
-      r.bug(fig, { x: l.x, y: l.y, heading: l.angle + 0.5 * Math.sin(l.phase), L: l.L, id: l.id });
+      this.drawLeaf(r, l, l.x, l.y, l.L, flap, l.angle + 0.5 * Math.sin(l.phase));
     }
   }
 }

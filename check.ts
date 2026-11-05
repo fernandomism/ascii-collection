@@ -63,7 +63,7 @@ run(beetles, 240, () => {
     if (out > b.L * 0.6) away.add(b);
     else if (out < 0 && away.delete(b)) cameBack++;
   }
-  for (const s of beetles.gnats.swarms) for (const g of s.gnats) if (Math.hypot(g.x - s.x, g.y - s.y) > 400) scattered++;
+  for (const s of beetles.gnats.groups) for (const g of s.members) if (Math.hypot(g.x - s.x, g.y - s.y) > 400) scattered++;
 });
 ok(still < 60, "beetles keep walking");
 ok(cameBack > 0, "beetles walked out of the scene and came back");
@@ -108,25 +108,35 @@ run(leaves, 60, () => {
 ok(refilled > leaves.leaves.length, "leaves keep falling and come back in at the top");
 ok(leaves.leaves.every((l) => l.y < H + l.L * 2 && l.x > -l.L * 2 && l.x < W + l.L * 2), "leaves stay in or near the scene");
 
-// Pond: a click ripples the water and drops food the koi eat; petals land with a ripple;
-// a dragonfly comes by; koi that swim out of view come back.
+// Pond: a click ripples the water and drops food the koi eat; petals land with a ripple, never
+// crowd the scene, and sink; a dragonfly comes by; koi that swim out of view come back.
 const pond = new PondScene();
 pond.resize(W, H, 12, 17);
 pond.click(W / 2, H / 2);
 ok(pond.ripples.length === 1 && pond.food.length === 6, "a click ripples the water and drops food");
+ok(pond.koi.length >= 3 && pond.koi.length <= 4, "three or four koi");
 let landings = 0;
+let sank = 0;
 let visited = false;
-let prevFloating = pond.petals.filter((p) => p.z === 0).length;
+let crowded = 0;
+let afloat = new Set(pond.petals.filter((p) => p.alt === 0));
 run(pond, 30, () => {
-  track(pond.koi)();
-  const floating = pond.petals.filter((p) => p.z === 0).length;
-  if (floating > prevFloating) landings++;
-  prevFloating = floating;
+  const now = new Set(pond.petals.filter((p) => p.alt === 0));
+  for (const p of now) if (!afloat.has(p)) landings++;
+  for (const p of afloat) if (!pond.petals.includes(p)) sank++;
+  afloat = now;
+  if (pond.petals.length > 14) crowded++;
   visited ||= pond.dragonfly.state !== "away";
 });
 ok(pond.food.length < 6, "koi ate some of the food");
-ok(landings > 0, "petals landed on the water");
+ok(landings > 0 && sank > 0, "petals land on the water and later sink");
+ok(crowded === 0, "petals never crowd the scene");
 ok(visited, "a dragonfly came by");
+const { Wp, D } = pond.view;
+ok(pond.koi.every((k) => k.x > -2 * k.L && k.x < Wp + 2 * k.L && k.y > -2 * k.L && k.y < D + 2 * k.L), "koi stay in or near the pond");
+const [ux, uy] = pond.view.unproject(300, 400);
+const [sx, sy] = pond.view.project(ux, uy);
+ok(Math.abs(sx - 300) < 0.01 && Math.abs(sy - 400) < 0.01, "a click lands where it was made on the angled water");
 
 ok(stray < 2, `bugs that wander off-screen come back (strayed ${stray.toFixed(2)} L)`);
 console.log(`ok (furthest off-screen: ${stray.toFixed(2)} body lengths)`);

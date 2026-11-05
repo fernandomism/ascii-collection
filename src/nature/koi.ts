@@ -12,39 +12,35 @@ import { clamp, patrol, rand, reenter, steer } from "../core/math";
 import type { Figure, Part, RGB } from "../core/render";
 
 const WHITE: RGB = [240, 236, 228];
-const RED: RGB = [224, 72, 40];
+const RED: RGB = [236, 96, 34];
 const BLACK: RGB = [38, 36, 40];
-const GOLD: RGB = [238, 188, 74];
-const BRONZE: RGB = [158, 110, 68];
-const BLUE: RGB = [120, 146, 172];
-const ORANGE: RGB = [230, 122, 52];
+const ORANGE: RGB = [240, 134, 44];
 /** Seen through a little water. */
 const WATER: RGB = [20, 70, 88];
 
 type Pattern = (x: number, y: number) => RGB;
 const blotch = (x: number, y: number, s: number) =>
   Math.sin(x * 11 + s) * Math.sin(y * 19 + s * 1.7) + 0.6 * Math.sin(x * 23 - y * 7 + s * 2.3);
-const scales = (x: number, y: number) => Math.sin(x * 70) * Math.sin(y * 70) > 0.8;
 
-/** Each variety's colours over body coordinates (x along the fish, y across it from the midline). */
-const VARIETIES: { name: string; gloss: number; fin: RGB; paint: (s: number) => Pattern }[] = [
-  { name: "kohaku", gloss: 0.5, fin: WHITE, paint: (s) => (x, y) => (blotch(x, y, s) > 0.3 ? RED : WHITE) },
-  {
-    name: "sanke", gloss: 0.5, fin: WHITE,
-    paint: (s) => (x, y) => (blotch(x, y, s + 5) > 0.95 ? BLACK : blotch(x, y, s) > 0.35 ? RED : WHITE),
-  },
-  {
-    name: "showa", gloss: 0.6, fin: [210, 200, 190],
-    paint: (s) => (x, y) => (blotch(x, y, s) > 0.3 ? RED : blotch(x, y, s + 9) > 0.55 ? WHITE : BLACK),
-  },
-  { name: "tancho", gloss: 0.5, fin: WHITE, paint: () => (x, y) => ((x - 0.3) ** 2 + y * y < 0.0045 ? RED : WHITE) },
-  { name: "ogon", gloss: 1.3, fin: [244, 214, 120], paint: () => (x) => mix(GOLD, [250, 226, 150], clamp(x + 0.3, 0, 1) * 0.4) },
-  { name: "chagoi", gloss: 0.7, fin: [190, 150, 104], paint: () => (x, y) => (scales(x, y) ? mix(BRONZE, BLACK, 0.35) : BRONZE) },
-  {
-    name: "asagi", gloss: 0.6, fin: [226, 150, 110],
-    paint: () => (x, y) => (Math.abs(y) > 0.075 ? ORANGE : scales(x, y) ? mix(BLUE, BLACK, 0.3) : BLUE),
-  },
-];
+/**
+ * Each variety's colours over body coordinates (x along the fish, y across it from the
+ * midline): the classic white, black and orange koi. Listed more than once = more common.
+ */
+const KOHAKU = { gloss: 0.5, fin: WHITE, paint: (s: number): Pattern => (x, y) => (blotch(x, y, s) > 0.3 ? RED : WHITE) };
+const SANKE = {
+  gloss: 0.5, fin: WHITE,
+  paint: (s: number): Pattern => (x, y) => (blotch(x, y, s + 5) > 0.95 ? BLACK : blotch(x, y, s) > 0.35 ? RED : WHITE),
+};
+const SHOWA = {
+  gloss: 0.6, fin: [210, 200, 190] as RGB,
+  paint: (s: number): Pattern => (x, y) => (blotch(x, y, s) > 0.3 ? RED : blotch(x, y, s + 9) > 0.55 ? WHITE : BLACK),
+};
+const TANCHO = { gloss: 0.5, fin: WHITE, paint: (): Pattern => (x, y) => ((x - 0.3) ** 2 + y * y < 0.0045 ? RED : WHITE) };
+const ORANGE_OGON = {
+  gloss: 1.2, fin: [246, 190, 120] as RGB,
+  paint: (): Pattern => (x) => mix(ORANGE, [250, 196, 110], clamp(x + 0.3, 0, 1) * 0.4),
+};
+const VARIETIES = [KOHAKU, KOHAKU, KOHAKU, SANKE, SANKE, SHOWA, SHOWA, TANCHO, ORANGE_OGON];
 
 // Body segments head to tail: x, half-length, half-width (fractions of L).
 const SEGMENTS = [
@@ -55,6 +51,14 @@ const SEGMENTS = [
   [-0.33, 0.08, 0.045],
 ] as const;
 const PECTORAL = [0.02, 0, 0, 0.1, -0.06, 0.16, -0.12, 0.14, -0.08, 0.05, -0.04, 0];
+
+/** A stretch of water (on the pond plane) for koi to patrol: origin and size. */
+export interface Area {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 export interface Food {
   x: number;
@@ -76,15 +80,19 @@ export interface Koi {
   pattern: Pattern;
   fin: RGB;
   gloss: number;
+  /** How much the water veils it: more for fish farther off. */
+  fog: number;
 }
 
 export function makeKoi(id: number, x: number, y: number, L: number, orbitR: number): Koi {
   const v = VARIETIES[Math.floor(Math.random() * VARIETIES.length)];
   const p = v.paint(rand(0, 100));
-  return {
+  const k: Koi = {
     id, x, y, L, orbitR, heading: rand(0, Math.PI * 2), speed: 0, phase: rand(0, 6), wander: 0,
-    orbitDir: id % 2 ? 1 : -1, pattern: (bx, by) => mix(p(bx, by), WATER, 0.12), fin: mix(v.fin, WATER, 0.25), gloss: v.gloss,
+    orbitDir: id % 2 ? 1 : -1, pattern: p, fin: mix(v.fin, WATER, 0.25), gloss: v.gloss, fog: 0.12,
   };
+  k.pattern = (bx, by) => mix(p(bx, by), WATER, k.fog);
+  return k;
 }
 
 /** Sideways sway of the spine at body position x: grows toward the tail and travels down it. */
@@ -120,7 +128,7 @@ export function koiFigure(k: Koi): Figure {
 /**
  * One step of a koi's swimming. Returns the bit of food it ate, if any.
  */
-export function stepKoi(k: Koi, dt: number, time: number, W: number, H: number, food: Food[], school: Koi[]): Food | null {
+export function stepKoi(k: Koi, dt: number, time: number, area: Area, food: Food[], school: Koi[]): Food | null {
   const L = k.L;
   const mx = k.x + Math.cos(k.heading) * L * 0.46;
   const my = k.y + Math.sin(k.heading) * L * 0.46;
@@ -145,7 +153,7 @@ export function stepKoi(k: Koi, dt: number, time: number, W: number, H: number, 
     dy += ((meal.y - my) / md) * 3;
     target = L * 0.7;
   } else {
-    const [px, py] = patrol(k.x, k.y, W, H, k.orbitR * (1 + 0.15 * Math.sin(time * 0.05 + k.id)), k.orbitDir);
+    const [px, py] = patrol(k.x - area.x, k.y - area.y, area.w, area.h, k.orbitR * (1 + 0.15 * Math.sin(time * 0.05 + k.id)), k.orbitDir);
     dx += px * 0.55;
     dy += py * 0.55;
     target = L * 0.28 * (0.85 + 0.15 * Math.sin(time * 0.6 + k.id));
@@ -167,6 +175,11 @@ export function stepKoi(k: Koi, dt: number, time: number, W: number, H: number, 
   k.x += Math.cos(k.heading) * k.speed * dt;
   k.y += Math.sin(k.heading) * k.speed * dt;
   k.phase += dt * (2.5 + (k.speed / L) * 9);
-  if (reenter(k, W, H, 1.8)) k.orbitR = rand(0.25, 0.65) * Math.min(W, H);
+  // Out of the area for good: it comes back in elsewhere (reenter works in the area's own frame).
+  k.x -= area.x;
+  k.y -= area.y;
+  if (reenter(k, area.w, area.h, 1.8)) k.orbitR = rand(0.25, 0.45) * Math.min(area.w, area.h);
+  k.x += area.x;
+  k.y += area.y;
   return meal && md < Math.max(14, L * 0.06) ? meal : null;
 }

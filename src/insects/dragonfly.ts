@@ -82,7 +82,11 @@ export class Dragonfly {
     this.y += Math.sin(this.heading) * this.speed * dt;
   }
 
-  draw(r: Renderer, id: number) {
+  /**
+   * `place` maps its position to the screen plus a size factor and how flat it looks there,
+   * for scenes seen at an angle; by default it's drawn as seen from straight above.
+   */
+  draw(r: Renderer, id: number, place: (x: number, y: number) => [number, number, number, number] = (x, y) => [x, y, 1, 1]) {
     if (this.state === "away") return;
     // Wings beat too fast to follow: they shimmer between full and foreshortened.
     const flap = 0.35 + 0.65 * Math.abs(Math.cos(this.flap));
@@ -97,6 +101,7 @@ export class Dragonfly {
     parts.push({ k: "ell", x: 0.13, y: 0, rx: 0.04, ry: 0.06, paint: THORAX, gloss: 0.6 });
     for (const side of SIDES) parts.push({ k: "ell", x: 0.14, y: side * 0.04, rx: 0.036, ry: 0.036, paint: EYE, gloss: 1.2 });
     const fig: Figure = { parts, strokes: [] };
-    r.bug(fig, { x: this.x, y: this.y, heading: this.heading, L: this.L, id, lift: 1 });
+    const [x, y, s, squash] = place(this.x, this.y);
+    r.bug(fig, { x, y, heading: this.heading, L: this.L * s, id, lift: 1, squash });
   }
 }

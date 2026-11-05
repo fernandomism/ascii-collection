@@ -38,6 +38,8 @@ export interface Placement {
   lift?: number;
   /** Odds a skin glyph flashes an iridescent accent. */
   shimmer?: number;
+  /** Vertical squash for a figure lying on a surface seen at an angle (1 = seen from straight above). */
+  squash?: number;
 }
 
 const SUB = [0.25, 0.3, 0.75, 0.3, 0.25, 0.72, 0.75, 0.72];
@@ -174,7 +176,8 @@ export class Renderer {
     this.width = width;
     this.height = height;
     this.dpr = dpr;
-    this.cw = this.backdrop.big ? clamp(Math.round(width / 124), 8, 13) : clamp(Math.round(width / 150), 7, 11);
+    // Big cells never drop below the sharks' typical size, even in a narrow window.
+    this.cw = this.backdrop.big ? clamp(Math.round(width / 110), 12, 14) : clamp(Math.round(width / 150), 7, 11);
     this.ch = Math.round(this.cw * 1.45);
     this.cols = Math.ceil(width / this.cw);
     this.rows = Math.ceil(height / this.ch);
@@ -296,6 +299,8 @@ export class Renderer {
 
     const R = reach * L + Math.hypot(cw, ch);
     const R2 = R * R;
+    // Screen offsets un-squash back onto the figure's surface before going into body space.
+    const unsquash = 1 / (p.squash ?? 1);
     const c0 = Math.max(0, Math.floor((p.x - R) / cw));
     const c1 = Math.min(cols - 1, Math.floor((p.x + R) / cw));
     const r0 = Math.max(0, Math.floor((p.y - R) / ch));
@@ -311,7 +316,7 @@ export class Renderer {
         const x = c * cw - p.x;
         const y = r * ch - p.y;
         let dx = x + cw / 2;
-        let dy = y + ch / 2;
+        let dy = (y + ch / 2) * unsquash;
         if (dx * dx + dy * dy > R2) continue;
         const bx = (dx * cos + dy * sin) * inv;
         const by = (-dx * sin + dy * cos) * inv;
@@ -325,7 +330,7 @@ export class Renderer {
         let hits = center ? 1 : 0;
         for (let k = 0; k < SUB.length; k += 2) {
           dx = x + SUB[k] * cw;
-          dy = y + SUB[k + 1] * ch;
+          dy = (y + SUB[k + 1] * ch) * unsquash;
           if (this.sample((dx * cos + dy * sin) * inv, (-dx * sin + dy * cos) * inv)) {
             if (!hits) {
               cr = this.hr;
@@ -454,9 +459,10 @@ export class Renderer {
   private stroke(s: Stroke, p: Placement, cos: number, sin: number) {
     const { L } = p;
     const x0 = p.x + (s.x0 * cos - s.y0 * sin) * L;
-    const y0 = p.y + (s.x0 * sin + s.y0 * cos) * L;
+    const q = p.squash ?? 1;
+    const y0 = p.y + (s.x0 * sin + s.y0 * cos) * L * q;
     const dx = p.x + (s.x1 * cos - s.y1 * sin) * L - x0;
-    const dy = p.y + (s.x1 * sin + s.y1 * cos) * L - y0;
+    const dy = p.y + (s.x1 * sin + s.y1 * cos) * L * q - y0;
     const g = (s.glyph ?? slope(dx / this.cw, dy / this.ch)).charCodeAt(0);
     const ink = pack(s.rgb[0], s.rgb[1], s.rgb[2]);
     const n = Math.max(1, Math.ceil(Math.hypot(dx / this.cw, dy / this.ch) * 2));
