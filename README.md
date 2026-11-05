@@ -51,8 +51,8 @@ The grey versions use the sharks' blue-grey with flickering rainbow glyphs.
 
 ```sh
 npm install
-npm run dev     # then open e.g. http://localhost:5173/nature/pond.html
-npm run build   # dist/ gets one self-contained HTML file per page: open it with a double-click
+npm run dev     # then open http://localhost:5173/ for the home page with every version
+npm run build   # dist/ gets one self-contained HTML file per page (and the home page): open with a double-click
 ```
 
 `npm run typecheck` checks types; `npm run check` runs every scene headless and checks its
