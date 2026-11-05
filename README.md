@@ -46,6 +46,7 @@ The grey versions use the sharks' blue-grey with flickering rainbow glyphs.
 | --- | --- |
 | `nature/leaves.html` | Maple, oak, birch and ginkgo leaves tumbling down an autumn grid. |
 | `nature/pond.html` | A koi pond from above. Click the water to ripple it and scatter food for the koi. Sakura petals fall and ripple the surface, lily pads float, gnats drift and a dragonfly comes by now and then. |
+| `nature/pond-iso.html` | The koi pond up close at an almost isometric angle: big koi, lily pads with pink water lilies drifting on a slow current, small dark fish deep below, two dragonflies, light rippling across the water and a slowly breathing glow. Click the water to ripple it and feed the koi. |
 
 ## Use
 
@@ -64,7 +65,7 @@ falling, koi eat, petals land, the dragonfly visits, and bugs that leave come ba
 ```
 src/core/      engine (loop, resize, input), renderer (supersampled ASCII cells), math, anatomy
 src/insects/   moths, beetles, ants, gnats, dragonfly
-src/nature/    leaves, pond, koi
+src/nature/    leaves, pond, pond-iso, koi
 src/main.ts    starts the scene a page names on its canvas, e.g.
                <canvas data-scene="moths" data-mode="crawl" data-look="grey">
 insects/, nature/   the pages

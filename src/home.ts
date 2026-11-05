@@ -38,6 +38,10 @@ const VERSIONS: Version[] = [
     id: "pond", section: "nature", title: "koi pond", scene: "pond",
     about: "A koi pond seen at an angle. Click the water to ripple it and feed the koi; petals drift down and a dragonfly visits.",
   },
+  {
+    id: "pond-iso", section: "nature", title: "koi pond · isometric", scene: "pond-iso",
+    about: "Up close at an isometric angle: big koi, pink water lilies, dragonflies and dark fish deep below. Click to feed the koi.",
+  },
 ];
 
 /** Render one still of a scene into a card's canvas, at a desktop-sized frame scaled down. */

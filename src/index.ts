@@ -5,3 +5,4 @@ export { BeetleScene, type BeetleKind } from "./insects/beetles";
 export { AntScene } from "./insects/ants";
 export { LeavesScene } from "./nature/leaves";
 export { PondScene } from "./nature/pond";
+export { IsoPondScene } from "./nature/pond-iso";

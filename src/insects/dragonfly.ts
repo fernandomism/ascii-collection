@@ -35,7 +35,7 @@ export class Dragonfly {
   private darts = 0;
   private flap = 0;
 
-  constructor(public L: number, firstVisit = rand(4, 10)) {
+  constructor(public L: number, firstVisit = rand(4, 10), private body: RGB = THORAX) {
     this.until = firstVisit;
   }
 
@@ -83,25 +83,26 @@ export class Dragonfly {
   }
 
   /**
-   * `place` maps its position to the screen plus a size factor and how flat it looks there,
-   * for scenes seen at an angle; by default it's drawn as seen from straight above.
+   * `place` maps its position to the screen plus a size factor, how flat it looks there and
+   * (optionally) a turn for the view, for scenes seen at an angle; by default it's drawn as
+   * seen from straight above.
    */
-  draw(r: Renderer, id: number, place: (x: number, y: number) => [number, number, number, number] = (x, y) => [x, y, 1, 1]) {
+  draw(r: Renderer, id: number, place: (x: number, y: number) => [number, number, number, number, number?] = (x, y) => [x, y, 1, 1]) {
     if (this.state === "away") return;
     // Wings beat too fast to follow: they shimmer between full and foreshortened.
     const flap = 0.35 + 0.65 * Math.abs(Math.cos(this.flap));
     const parts: Part[] = [
-      { k: "seg", x0: -0.05, y0: 0, x1: -0.6, y1: 0, r0: 0.032, r1: 0.018, paint: (u) => ((u * 9) % 1 < 0.22 ? RING : THORAX), gloss: 0.8 },
+      { k: "seg", x0: -0.05, y0: 0, x1: -0.6, y1: 0, r0: 0.032, r1: 0.018, paint: (u) => ((u * 9) % 1 < 0.22 ? RING : this.body), gloss: 0.8 },
     ];
     for (const side of SIDES) {
       parts.push({ k: "wing", poly: HIND, x: 0.01, side, sweep: 0.18, flap, paint: wingPaint, ramp: ".:-=" });
       parts.push({ k: "wing", poly: FORE, x: 0.06, side, sweep: -0.1, flap, paint: wingPaint, ramp: ".:-=" });
     }
-    parts.push({ k: "ell", x: 0.04, y: 0, rx: 0.075, ry: 0.05, paint: THORAX, gloss: 0.9 });
-    parts.push({ k: "ell", x: 0.13, y: 0, rx: 0.04, ry: 0.06, paint: THORAX, gloss: 0.6 });
+    parts.push({ k: "ell", x: 0.04, y: 0, rx: 0.075, ry: 0.05, paint: this.body, gloss: 0.9 });
+    parts.push({ k: "ell", x: 0.13, y: 0, rx: 0.04, ry: 0.06, paint: this.body, gloss: 0.6 });
     for (const side of SIDES) parts.push({ k: "ell", x: 0.14, y: side * 0.04, rx: 0.036, ry: 0.036, paint: EYE, gloss: 1.2 });
     const fig: Figure = { parts, strokes: [] };
-    const [x, y, s, squash] = place(this.x, this.y);
-    r.bug(fig, { x, y, heading: this.heading, L: this.L * s, id, lift: 1, squash });
+    const [x, y, s, squash, turn = 0] = place(this.x, this.y);
+    r.bug(fig, { x, y, heading: this.heading + turn, L: this.L * s, id, lift: 1, squash });
   }
 }

@@ -4,12 +4,14 @@ import { BeetleScene } from "./insects/beetles";
 import { MothScene } from "./insects/moths";
 import { LeavesScene } from "./nature/leaves";
 import { PondScene } from "./nature/pond";
+import { IsoPondScene } from "./nature/pond-iso";
 
-/** A fresh scene by name (moths | beetles | ants | leaves | pond); mode is the moths' fly | crawl. */
+/** A fresh scene by name (moths | beetles | ants | leaves | pond | pond-iso); mode is the moths' fly | crawl. */
 export function makeScene(name = "moths", mode?: string): Scene {
   if (name === "beetles") return new BeetleScene();
   if (name === "ants") return new AntScene();
   if (name === "leaves") return new LeavesScene();
   if (name === "pond") return new PondScene();
+  if (name === "pond-iso") return new IsoPondScene();
   return new MothScene(undefined, mode === "crawl" ? "crawl" : "fly");
 }
