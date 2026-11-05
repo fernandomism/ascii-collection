@@ -2,14 +2,15 @@
  * Beetles on the forest floor: a flower chafer, a goliath, a stag, rhinoceros
  * and hercules beetles, a jewel beetle and a ladybird.
  *
- * They plod in a tripod gait and stop now and then to feel around. Horned
- * males seek each other out; when two meet head-on they lock horns and shove
- * until one gives up and backs off. Click a beetle to startle it into flight:
- * the elytra lift, the hindwings unfold and it buzzes off to land elsewhere.
+ * Like the sharks, they never stop: each walks a lazy loop round the scene that
+ * carries it out past the edges and back, in a tripod gait. Swarms of gnats drift
+ * through like the sharks' fish. Click a beetle to startle it into flight: the
+ * elytra lift, the hindwings unfold and it buzzes off to land elsewhere.
  */
 import { dotted, limb, mix, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { beyondEdge, clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "./math";
+import { Gnats } from "./gnats";
+import { clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "./math";
 import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "./render";
 
 export type BeetleKind = "flower" | "goliath" | "stag" | "rhino" | "hercules" | "jewel" | "ladybug";
@@ -19,8 +20,6 @@ interface Look {
   scale: number;
   /** Walking speed in body lengths per second. */
   speed: number;
-  /** Horned males pick fights. */
-  fighter: boolean;
   /** [x, rx, ry] in body units; ely is one wing case, sitting at y = ±ry. */
   head: [number, number, number];
   pron: [number, number, number];
@@ -57,13 +56,6 @@ interface Beetle {
   lift: number;
   flap: number;
   flyUntil: number;
-  rival: Beetle | null;
-  sparUntil: number;
-  fleeUntil: number;
-  /** No new fights before this. */
-  calmAt: number;
-  /** Set when it storms off out of the scene after losing a fight. */
-  trip: [number, number] | null;
 }
 
 const BLACK: RGB = [34, 30, 30];
@@ -87,7 +79,7 @@ const LEGS = [
 const LOOKS: Record<BeetleKind, Look> = {
   // Rose chafer: compact metallic green, white flecks toward the rear.
   flower: {
-    scale: 0.6, speed: 0.31, fighter: false,
+    scale: 0.6, speed: 0.31,
     head: [0.31, 0.06, 0.075], pron: [0.19, 0.1, 0.16], ely: [-0.13, 0.3, 0.115],
     headPaint: [50, 140, 70], pronPaint: [56, 160, 78],
     elyPaint: (u, v) =>
@@ -96,7 +88,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Goliath: striped white-and-black pronotum, chestnut wing cases edged in white, a short Y horn.
   goliath: {
-    scale: 1, speed: 0.2, fighter: false,
+    scale: 1, speed: 0.2,
     head: [0.34, 0.065, 0.085], pron: [0.21, 0.12, 0.19], ely: [-0.15, 0.33, 0.13],
     headPaint: BLACK,
     pronPaint: (_u, v) => {
@@ -112,12 +104,12 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Stag beetle: a wide head carrying antler-like jaws, chestnut wing cases.
   stag: {
-    scale: 1.1, speed: 0.22, fighter: true,
+    scale: 1.1, speed: 0.22,
     head: [0.27, 0.085, 0.15], pron: [0.12, 0.095, 0.16], ely: [-0.22, 0.3, 0.11],
     headPaint: [62, 36, 28], pronPaint: [58, 34, 28], elyPaint: () => [128, 60, 36],
     under: [50, 30, 24], leg: [110, 70, 50], gloss: 0.5, antenna: "elbow",
     horns: (out, b, t) => {
-      const open = b.rival ? 0.55 + 0.45 * Math.sin(t * 6 + b.id) : 0.12 + 0.08 * Math.sin(b.feel);
+      const open = 0.12 + 0.08 * Math.sin(b.feel);
       const jaw: RGB = [146, 66, 36];
       for (const side of SIDES) {
         const a = side * open * 0.35;
@@ -144,7 +136,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Japanese rhinoceros beetle: one long head horn forked at the tip, a nub on the pronotum.
   rhino: {
-    scale: 1, speed: 0.2, fighter: true,
+    scale: 1, speed: 0.2,
     head: [0.3, 0.065, 0.09], pron: [0.17, 0.13, 0.2], ely: [-0.17, 0.33, 0.13],
     headPaint: [92, 44, 30], pronPaint: [96, 46, 30], elyPaint: () => [116, 58, 36],
     under: [60, 32, 24], leg: [120, 66, 44], gloss: 0.8, antenna: "club",
@@ -158,7 +150,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   // Hercules beetle: glossy black front, a huge pronotal horn with a golden-haired underside,
   // and olive wing cases with black spots.
   hercules: {
-    scale: 1.25, speed: 0.18, fighter: true,
+    scale: 1.25, speed: 0.18,
     head: [0.28, 0.055, 0.08], pron: [0.17, 0.13, 0.19], ely: [-0.18, 0.34, 0.135],
     headPaint: BLACK, pronPaint: [40, 38, 40],
     elyPaint: (u, v) => (dotted(u, v, 0.34, 0.42, 3, 0.32) ? [44, 38, 30] : [188, 168, 98]),
@@ -175,7 +167,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Jewel beetle: slim and bullet-shaped, iridescent green running to copper, a red stripe.
   jewel: {
-    scale: 0.75, speed: 0.35, fighter: false,
+    scale: 0.75, speed: 0.35,
     head: [0.33, 0.045, 0.07], pron: [0.24, 0.08, 0.11], ely: [-0.15, 0.37, 0.085],
     headPaint: [40, 150, 110], pronPaint: (u) => mix([30, 160, 120], [200, 120, 50], (1 - u) * 0.3),
     elyPaint: (u, v) => {
@@ -186,7 +178,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Seven-spot ladybird.
   ladybug: {
-    scale: 0.6, speed: 0.42, fighter: false,
+    scale: 0.6, speed: 0.42,
     head: [0.25, 0.05, 0.09], pron: [0.18, 0.07, 0.17], ely: [-0.06, 0.27, 0.2],
     headPaint: BLACK, pronPaint: (u, v) => (Math.abs(v) > 0.55 && u > -0.3 ? [232, 230, 222] : BLACK),
     elyPaint: (u, v) => {
@@ -259,19 +251,27 @@ export class BeetleScene implements Scene {
   time = 0;
   pointer = { x: 0, y: 0, active: false };
   beetles: Beetle[] = [];
+  gnats = new Gnats();
   private W = 0;
   private H = 0;
+  private cw = 10;
+  private ch = 14;
 
   constructor(private kinds: BeetleKind[] = ALL_KINDS) {
     this.kinds = kinds.filter((k) => k in LOOKS);
     if (!this.kinds.length) this.kinds = ALL_KINDS;
   }
 
-  resize(width: number, height: number) {
+  resize(width: number, height: number, cw: number, ch: number) {
     const first = this.W === 0;
     this.W = width;
     this.H = height;
-    if (first) this.seed();
+    this.cw = cw;
+    this.ch = ch;
+    if (first) {
+      this.seed();
+      this.gnats.seed(width, height);
+    }
   }
 
   private seed() {
@@ -293,7 +293,6 @@ export class BeetleScene implements Scene {
         id: i + 1, kind, look, x, y, heading: rand(0, TAU), speed: 0, L,
         gait: rand(0, TAU), wander: 0, feel: rand(0, TAU),
         orbitR: 0, orbitDir: i % 2 ? -1 : 1, open: 0, lift: 0, flap: 0, flyUntil: 0,
-        rival: null, sparUntil: 0, fleeUntil: 0, calmAt: rand(4, 10), trip: null,
       };
       b.orbitR = this.pickOrbit();
       this.beetles.push(b);
@@ -306,6 +305,7 @@ export class BeetleScene implements Scene {
   }
 
   click(x: number, y: number) {
+    this.gnats.scatter(x, y);
     let best: Beetle | null = null;
     let bd = Infinity;
     for (const b of this.beetles) {
@@ -318,8 +318,6 @@ export class BeetleScene implements Scene {
     if (!best) return;
     best.flyUntil = this.time + rand(1.8, 2.6);
     best.heading = Math.atan2(best.y - y, best.x - x) + rand(-0.5, 0.5);
-    if (best.rival) best.rival.rival = null;
-    best.rival = null;
   }
 
   step(dt: number) {
@@ -344,62 +342,30 @@ export class BeetleScene implements Scene {
         dy += Math.sin(b.heading + b.wander) * 0.6;
         target = L * 1.1 * b.lift;
         turn = 2.5;
-      } else if (b.rival) {
-        // Lock horns: face the rival and shove back and forth.
-        const o = b.rival;
-        const d = Math.hypot(o.x - b.x, o.y - b.y) || 1;
-        dx += ((o.x - b.x) / d) * 4;
-        dy += ((o.y - b.y) / d) * 4;
-        target = L * 0.12 * Math.sin(time * 4.5 + (b.id % 2) * Math.PI);
-        turn = 2;
-        if (time > b.sparUntil && b.id < o.id) {
-          // The loser storms off out of the scene.
-          const loser = Math.random() < 0.5 ? b : o;
-          loser.trip = beyondEdge(W, H, loser.L * 2.5);
-          loser.fleeUntil = time + 4;
-          b.rival = o.rival = null;
-          b.calmAt = o.calmAt = time + rand(10, 16);
-        }
       } else {
         // Like the sharks: always on the move, a drifting wander on top of a lazy
         // loop round the scene that carries it out past the edges and back.
         b.wander = clamp(b.wander + (Math.random() - 0.5) * dt * 3, -1.1, 1.1);
         dx += Math.cos(b.heading + b.wander) * 0.45;
         dy += Math.sin(b.heading + b.wander) * 0.45;
-        if (b.trip) {
-          const d = Math.hypot(b.trip[0] - b.x, b.trip[1] - b.y) || 1;
-          dx += ((b.trip[0] - b.x) / d) * 2;
-          dy += ((b.trip[1] - b.y) / d) * 2;
-        } else {
-          const radius = b.orbitR * (1 + 0.15 * Math.sin(time * 0.05 + b.id));
-          const [px, py] = patrol(b.x, b.y, W, H, radius, b.orbitDir);
-          dx += px * 0.55;
-          dy += py * 0.55;
-          if (Math.random() < dt / 40) b.orbitR = this.pickOrbit();
-        }
-        const fighting = b.look.fighter && time > b.calmAt;
+        const radius = b.orbitR * (1 + 0.15 * Math.sin(time * 0.05 + b.id));
+        const [px, py] = patrol(b.x, b.y, W, H, radius, b.orbitDir);
+        dx += px * 0.55;
+        dy += py * 0.55;
+        if (Math.random() < dt / 40) b.orbitR = this.pickOrbit();
+        // Give way to each other, like the sharks.
         for (const o of this.beetles) {
           if (o === b || o.lift > 0.05) continue;
           const ox = o.x - b.x;
           const oy = o.y - b.y;
           const d = Math.hypot(ox, oy) || 1;
-          const ahead = (Math.cos(b.heading) * ox + Math.sin(b.heading) * oy) / d;
-          if (fighting && o.look.fighter && time > o.calmAt && !o.rival) {
-            // A calm male squares up to another one it sees ahead.
-            if (d < L * 3 && ahead > 0.3) {
-              dx += (ox / d) * 0.9;
-              dy += (oy / d) * 0.9;
-            }
-          } else {
-            // Everyone else gives way, like the sharks.
-            const range = (L + o.L) * 0.45;
-            if (d < range) {
-              dx -= (ox / d) * (1 - d / range) * 3;
-              dy -= (oy / d) * (1 - d / range) * 3;
-            }
+          const range = (L + o.L) * 0.45;
+          if (d < range) {
+            dx -= (ox / d) * (1 - d / range) * 3;
+            dy -= (oy / d) * (1 - d / range) * 3;
           }
         }
-        target = b.look.speed * L * (time < b.fleeUntil ? 2.2 : 1) * (0.85 + 0.15 * Math.sin(time * 0.7 + b.id));
+        target = b.look.speed * L * (0.85 + 0.15 * Math.sin(time * 0.7 + b.id));
         // Turning circle grows with speed, so it walks arcs instead of spinning on the spot.
         turn = Math.min(1.2, Math.abs(b.speed) / (L * 0.35));
       }
@@ -409,17 +375,15 @@ export class BeetleScene implements Scene {
       b.x += Math.cos(b.heading) * b.speed * dt;
       b.y += Math.sin(b.heading) * b.speed * dt;
       b.gait += ((Math.abs(b.speed) * dt) / (L * 0.28)) * Math.PI * (b.lift > 0.1 ? 0 : 1);
-      if (reenter(b, W, H, 1.8)) {
-        b.trip = null;
-        b.orbitR = this.pickOrbit();
-      }
+      if (reenter(b, W, H, 1.8)) b.orbitR = this.pickOrbit();
     }
     this.collide();
+    this.gnats.step(dt, W, H, time, this.pointer);
   }
 
-  /** Push grounded bodies apart, and start a fight when two calm fighters meet head-on. */
+  /** Push grounded bodies apart. */
   private collide() {
-    const { beetles, time } = this;
+    const { beetles } = this;
     for (let i = 0; i < beetles.length; i++) {
       for (let j = i + 1; j < beetles.length; j++) {
         const a = beetles[i];
@@ -436,17 +400,6 @@ export class BeetleScene implements Scene {
           b.x += (dx / d) * push;
           b.y += (dy / d) * push;
         }
-        const facing =
-          (Math.cos(a.heading) * dx + Math.sin(a.heading) * dy) / d > 0.3 &&
-          (-Math.cos(b.heading) * dx - Math.sin(b.heading) * dy) / d > 0.3;
-        if (
-          a.look.fighter && b.look.fighter && !a.rival && !b.rival && facing &&
-          time > a.calmAt && time > b.calmAt && d < (a.L + b.L) * 0.45
-        ) {
-          a.rival = b;
-          b.rival = a;
-          a.sparUntil = b.sparUntil = time + rand(3, 5);
-        }
       }
     }
   }
@@ -459,6 +412,8 @@ export class BeetleScene implements Scene {
         x: b.x, y: b.y, heading: b.heading, L: b.L * (1 + 0.12 * b.lift), id: b.id, lift: b.lift, shimmer: b.look.shimmer,
       });
     }
+    // Gnats fly over everything.
+    this.gnats.draw(r, this.cw, this.ch);
   }
 
   /** Leaf litter. */

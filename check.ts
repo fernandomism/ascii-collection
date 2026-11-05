@@ -40,24 +40,32 @@ ants.click(W / 2 + 250, H / 2);
 ants.click(W / 2 - 250, H / 2);
 run(ants, 90, track(ants.ants));
 ok(ants.foods.reduce((n, f) => n + f.amount, 0) < 24, "ants carried food away");
-ok(ants.ants.length > colony, "colony grew from stored food");
+ok(ants.ants.length === colony, "the colony stays the same size");
 run(ants, 90, track(ants.ants));
 ok(returns > 0, "ants left the scene and came back");
 
-// Beetles: horned males lock horns sooner or later; they wander out and back in;
-// a click sends one flying and it lands again.
+// Beetles: always walking, never standing still; they wander out and back in;
+// gnats stay with their swarms; a click sends a beetle flying and it lands again.
 const beetles = new BeetleScene();
-beetles.resize(W, H);
-returns = 0;
-let fought = false;
-for (let i = 0; i < 180 / dt && !fought; i++) {
-  beetles.step(dt);
+beetles.resize(W, H, 10, 15);
+let still = 0;
+let scattered = 0;
+const away = new Set<object>();
+let cameBack = 0;
+run(beetles, 240, () => {
   track(beetles.beetles)();
-  fought = beetles.beetles.some((b) => b.rival);
-}
-ok(fought, "two beetles locked horns");
-run(beetles, 120, track(beetles.beetles));
-ok(returns > 0, "beetles left the scene and came back");
+  for (const b of beetles.beetles) {
+    if (Math.abs(b.speed) < b.L * 0.02) still++;
+    // Like the sharks: fully out of sight, then back in view.
+    const out = Math.max(-b.x, b.x - W, -b.y, b.y - H);
+    if (out > b.L * 0.6) away.add(b);
+    else if (out < 0 && away.delete(b)) cameBack++;
+  }
+  for (const s of beetles.gnats.swarms) for (const g of s.gnats) if (Math.hypot(g.x - s.x, g.y - s.y) > 400) scattered++;
+});
+ok(still < 60, "beetles keep walking");
+ok(cameBack > 0, "beetles walked out of the scene and came back");
+ok(scattered < 60, "gnats stay with their swarm");
 const b = beetles.beetles[0];
 beetles.click(b.x, b.y);
 run(beetles, 1);

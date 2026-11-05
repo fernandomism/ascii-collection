@@ -39,14 +39,14 @@ the edges, and now and then leave the scene altogether and come back in somewher
   that follows your mouse), and with no light they roam in and out of the scene. Clicking a perched moth makes it flash its wings open to show its eyespots.
 - **beetles** (`#beetles`): flower chafer, goliath, stag, rhinoceros, hercules, jewel
   beetle and ladybird. Like the sharks, they never stop: each walks its own lazy loop
-  round the scene, wide enough to carry it out past the edges and back. Horned males that
-  meet lock horns until one gives up and storms off. Click a beetle to startle it: the wing cases lift, the hindwings unfold and it
-  flies off.
-- **ants** (`#ants`): a colony of detailed ants (mandibles, elbowed antennae, a segmented
-  gaster, six legs in a tripod gait). Click to drop food. Foragers smell it, bite off
-  crumbs, carry them straight home and lay a pheromone trail that others follow. Ants
-  that meet stop to touch antennae, and every 3 crumbs stored hatch another ant. With no
-  food about, foragers set off out of the scene and later walk back in to the nest.
+  round the scene, wide enough to carry it out past the edges and back. Swarms of gnats
+  drift through like the sharks' fish, darting away from the cursor and bursting apart
+  where you click. Click a beetle to startle it: the wing cases lift, the hindwings unfold
+  and it flies off.
+- **ants** (`#ants`): detailed ants (mandibles, elbowed antennae, a segmented gaster, six
+  legs in a tripod gait) exploring on long looping paths in and out of the scene. Click to
+  drop food: explorers smell it, bite off crumbs, carry them straight home to the nest and
+  lay a pheromone trail that others follow. Ants that meet stop to touch antennae.
 
 ```sh
 npm install && npm run dev
@@ -65,9 +65,9 @@ const engine = new BugEngine(canvas, new AntScene());
 ```
 
 `npm run typecheck` checks types. `npm run check` runs the three simulations headless and
-checks that ants forage and the colony grows, beetles fight, fly and land, moths
-circle the lamp or roam with it off, land and flash their wings, and that bugs leave the
-scene and come back in.
+checks that ants forage, beetles keep walking, fly and land and their gnats stay in swarms,
+moths circle the lamp or roam with it off, land and flash their wings, and that bugs leave
+the scene and come back in.
 
 Respects `prefers-reduced-motion` (it draws a single still frame) and pauses when off-screen.
 

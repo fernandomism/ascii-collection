@@ -15,7 +15,6 @@ const lightButtons = lights.querySelectorAll<HTMLButtonElement>("button");
 
 let engine: BugEngine | undefined;
 let moths: MothScene | undefined;
-let ticker = 0;
 let grey = false;
 const lit = { lamp: true, cursor: true };
 
@@ -56,7 +55,6 @@ function setLights() {
 function show() {
   const bug = location.hash.slice(1) || "moths";
   engine?.destroy();
-  clearInterval(ticker);
   moths = undefined;
   for (const a of document.querySelectorAll("nav a")) {
     if (a.getAttribute("href") === `#${bug}`) a.setAttribute("aria-current", "page");
@@ -65,11 +63,8 @@ function show() {
 
   let scene: Scene;
   if (bug === "ants") {
-    const ants = new AntScene();
-    scene = ants;
-    const status = () => (hint.textContent = `click to drop food · ${ants.status()}`);
-    status();
-    ticker = window.setInterval(status, 500);
+    scene = new AntScene();
+    hint.textContent = "click to drop food";
   } else if (bug === "beetles") {
     scene = new BeetleScene(kinds as BeetleKind[] | undefined);
     hint.textContent = "click a beetle to startle it";

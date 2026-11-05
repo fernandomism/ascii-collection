@@ -1,15 +1,14 @@
 /**
- * An ant colony, drawn big and detailed. Click to drop food.
+ * Detailed ants exploring. Click to drop food.
  *
- * Foragers wander out of the nest until they smell food, bite off a crumb and
- * carry it straight home (ants find their way back by path integration, not
- * by retracing their steps). Laden ants lay a pheromone trail on the way, and
- * explorers that cross it follow it away from the nest to the food. Ants that
- * meet stop to touch antennae. Every few crumbs stored hatch another worker.
+ * Explorers roam the scene on long looping paths, like the sharks, wandering out
+ * past the edges and back. When one smells food it bites off a crumb and carries
+ * it straight home to the nest, laying a pheromone trail that other explorers
+ * follow back out to the food. Ants that meet stop to touch antennae.
  */
 import { limb, mix, scale, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { beyondEdge, clamp, edgePull, hash3, rand, reenter, steer, TAU } from "./math";
+import { clamp, hash3, patrol, rand, reenter, steer, TAU } from "./math";
 import type { Figure, Part, Renderer, RGB, Stroke } from "./render";
 
 const HEAD: RGB = [198, 86, 46];
@@ -21,7 +20,6 @@ const LEG: RGB = [176, 98, 62];
 const EYE: RGB = [18, 14, 14];
 const TRAIL: RGB = [200, 140, 64];
 const FOODS: RGB[] = [[240, 232, 210], [214, 168, 96], [238, 198, 72], [216, 74, 60], [150, 200, 90]];
-const CRUMBS_PER_ANT = 3;
 
 // Per leg pair (front, middle, hind): hip x, rest angle, femur/tibia/tarsus lengths, bend at each joint.
 const LEGS = [
@@ -59,11 +57,9 @@ interface Ant {
   feel: number;
   pauseUntil: number;
   greetAt: number;
-  /** Give up exploring and head home at this time. */
-  homeAt: number;
-  /** A foraging trip out past the edge of the screen, and when to start the next one. */
-  trip: [number, number] | null;
-  tripAt: number;
+  /** Its exploring loop round the scene (px) and which way round it walks. */
+  orbitR: number;
+  orbitDir: 1 | -1;
 }
 
 const gasterPaint = (u: number, v: number): RGB => {
@@ -123,7 +119,6 @@ export class AntScene implements Scene {
   pointer = { x: 0, y: 0, active: false };
   ants: Ant[] = [];
   foods: Food[] = [];
-  stored = 0;
   private W = 0;
   private H = 0;
   private cw = 10;
@@ -153,12 +148,8 @@ export class AntScene implements Scene {
     this.nest = { x: width / 2, y: height * 0.55, r: clamp(Math.min(width, height) * 0.06, 36, 64) };
     if (first) {
       const n = clamp(Math.round((width * height) / (this.baseL ** 2 * 4.5)), 10, 24);
-      for (let i = 0; i < n; i++) this.spawn(i === 0);
+      for (let i = 0; i < n; i++) this.spawn(i % 8 === 0);
     }
-  }
-
-  status() {
-    return `${this.ants.length} ants · ${this.stored} crumbs stored`;
   }
 
   click(x: number, y: number) {
@@ -178,10 +169,6 @@ export class AntScene implements Scene {
     const fade = Math.exp(-dt / 28);
     for (let i = 0; i < this.pher.length; i++) this.pher[i] *= fade;
     if (this.foods.some((f) => f.amount <= 0)) this.foods = this.foods.filter((f) => f.amount > 0);
-    while (this.stored >= CRUMBS_PER_ANT && this.ants.length < this.cap()) {
-      this.stored -= CRUMBS_PER_ANT;
-      this.spawn(Math.random() < 0.15);
-    }
   }
 
   draw(r: Renderer) {
@@ -217,8 +204,9 @@ export class AntScene implements Scene {
     return null;
   }
 
-  private cap() {
-    return clamp(Math.round((this.W * this.H) / (this.baseL ** 2 * 1.6)), 16, 48);
+  /** Loops from well inside the scene to well beyond its edges. */
+  private pickOrbit() {
+    return rand(0.2, 0.62) * Math.min(this.W, this.H);
   }
 
   private foodR(f: Food) {
@@ -226,13 +214,14 @@ export class AntScene implements Scene {
   }
 
   private spawn(major: boolean) {
+    // Scattered over the scene, already out exploring.
     const a = rand(0, TAU);
-    const { nest } = this;
+    const r = this.pickOrbit();
     this.ants.push({
       id: this.nextId++,
-      x: nest.x + Math.cos(a) * nest.r,
-      y: nest.y + Math.sin(a) * nest.r,
-      heading: a,
+      x: this.W / 2 + Math.cos(a) * r * (this.W / Math.min(this.W, this.H)),
+      y: this.H / 2 + Math.sin(a) * r,
+      heading: a + Math.PI / 2,
       speed: 0,
       L: this.baseL * (major ? 1.25 : rand(0.8, 1)),
       major,
@@ -245,9 +234,8 @@ export class AntScene implements Scene {
       feel: rand(0, TAU),
       pauseUntil: 0,
       greetAt: this.time + 3,
-      homeAt: this.time + rand(20, 35),
-      trip: null,
-      tripAt: this.time + rand(5, 20),
+      orbitR: r,
+      orbitDir: this.nextId % 2 ? 1 : -1,
     });
     // Smaller ants draw first so the big ones walk over them.
     this.ants.sort((p, q) => p.L - q.L);
@@ -280,12 +268,10 @@ export class AntScene implements Scene {
         if (i >= 0) this.pher[i] = Math.min(1, this.pher[i] + dt * 2);
       }
       if (Math.hypot(hx - nest.x, hy - nest.y) < nest.r * 1.3) {
-        if (a.carry) this.stored++;
         a.carry = null;
         const back = a.memory && a.memory.amount > 0 ? a.memory : null;
         a.state = back ? "toFood" : "explore";
         a.target = back;
-        a.homeAt = time + rand(20, 35);
         a.heading += Math.PI + rand(-0.4, 0.4);
         a.pauseUntil = time + rand(0.4, 0.8);
         return;
@@ -345,27 +331,12 @@ export class AntScene implements Scene {
           dx += Math.cos(bestA) * 2;
           dy += Math.sin(bestA) * 2;
         }
-        const nd = Math.hypot(a.x - nest.x, a.y - nest.y) || 1;
-        if (nd < nest.r * 3) {
-          dx += ((a.x - nest.x) / nd) * 0.8;
-          dy += ((a.y - nest.y) / nd) * 0.8;
-        }
-        if (time > a.tripAt && !a.trip) a.trip = beyondEdge(this.W, this.H, L * 1.5);
-        if (a.trip) {
-          const tx = a.trip[0] - a.x;
-          const ty = a.trip[1] - a.y;
-          const d = Math.hypot(tx, ty) || 1;
-          dx += (tx / d) * 2.5;
-          dy += (ty / d) * 2.5;
-        } else if (time > a.homeAt) {
-          a.state = "home";
-        }
+        // Explore like the sharks patrol: a loop round the scene that runs out past the edges and back.
+        const [px, py] = patrol(a.x, a.y, this.W, this.H, a.orbitR * (1 + 0.15 * Math.sin(time * 0.07 + a.id)), a.orbitDir);
+        dx += px * 0.8;
+        dy += py * 0.8;
+        if (Math.random() < dt / 30) a.orbitR = this.pickOrbit();
       }
-    }
-    if (!a.trip) {
-      const [ex, ey] = edgePull(a.x, a.y, this.W, this.H, L);
-      dx += ex;
-      dy += ey;
     }
 
     a.heading = steer(a.heading, Math.atan2(dy, dx), 2.8 * dt);
@@ -374,12 +345,7 @@ export class AntScene implements Scene {
     a.x += Math.cos(a.heading) * a.speed * dt;
     a.y += Math.sin(a.heading) * a.speed * dt;
     a.gait += ((a.speed * dt) / (L * 0.3)) * Math.PI;
-    // Out of sight: the forager comes back in somewhere else and heads home.
-    if (reenter(a, this.W, this.H)) {
-      a.trip = null;
-      a.tripAt = time + rand(12, 30);
-      a.state = "home";
-    }
+    if (reenter(a, this.W, this.H, 1.8)) a.orbitR = this.pickOrbit();
   }
 
   /** Keep bodies apart, and let ants that bump heads stop to touch antennae. */
