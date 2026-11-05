@@ -1,5 +1,5 @@
 // Adapted from ascii-sharks' OceanEngine (MIT, © 2026 drewdi).
-import { Renderer, type RGB } from "./render";
+import { Renderer, type Backdrop, type RGB } from "./render";
 
 /** A bug sim the engine can run: moths, beetles or ants. */
 export interface Scene {
@@ -10,6 +10,8 @@ export interface Scene {
   /** Put this frame's cells and bugs on the renderer. */
   draw(r: Renderer): void;
   click?(x: number, y: number): void;
+  /** Its own page and grid colours, and cell size; black with fine cells if unset. */
+  backdrop?: Backdrop;
   /** Static ground glyph for a cell, baked once per resize. */
   ground?(col: number, row: number): [string, RGB] | null;
 }
@@ -35,6 +37,7 @@ export class BugEngine {
   constructor(private canvas: HTMLCanvasElement, private scene: Scene) {
     this.renderer = new Renderer(canvas);
     this.renderer.setFontFamily(getComputedStyle(canvas).fontFamily);
+    if (scene.backdrop) this.renderer.backdrop = scene.backdrop;
     this.reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     this.resizeObserver = new ResizeObserver(() => this.resize());

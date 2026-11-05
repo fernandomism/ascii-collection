@@ -7,11 +7,11 @@
  * through like the sharks' fish. Click a beetle to startle it into flight: the
  * elytra lift, the hindwings unfold and it buzzes off to land elsewhere.
  */
-import { dotted, limb, mix, SIDES, tripod } from "./anatomy";
-import type { Scene } from "./engine";
+import { dotted, limb, mix, SIDES, tripod } from "../core/anatomy";
+import type { Scene } from "../core/engine";
 import { Gnats } from "./gnats";
-import { clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "./math";
-import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "./render";
+import { clamp, hash3, patrol, rand, reenter, smoothstep, steer, TAU } from "../core/math";
+import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "../core/render";
 
 export type BeetleKind = "flower" | "goliath" | "stag" | "rhino" | "hercules" | "jewel" | "ladybug";
 

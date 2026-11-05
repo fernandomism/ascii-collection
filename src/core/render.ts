@@ -78,7 +78,7 @@ function inPoly(p: readonly number[], x: number, y: number) {
 }
 
 /** Glyph for a line running (dx, dy) in cell units. */
-function slope(dx: number, dy: number) {
+export function slope(dx: number, dy: number) {
   let a = Math.atan2(dy, dx);
   if (a < 0) a += Math.PI;
   if (a < Math.PI / 8 || a > (Math.PI * 7) / 8) return "-";
@@ -88,9 +88,9 @@ function slope(dx: number, dy: number) {
 }
 
 /** Faint cell grid, snapped to device pixels. */
-function paintGrid(g: CanvasRenderingContext2D, W: number, H: number, cw: number, ch: number, dpr: number) {
+function paintGrid(g: CanvasRenderingContext2D, W: number, H: number, cw: number, ch: number, dpr: number, color: string) {
   g.setTransform(1, 0, 0, 1, 0, 0);
-  g.strokeStyle = "rgba(255,255,255,0.055)";
+  g.strokeStyle = color;
   g.lineWidth = 1;
   g.beginPath();
   for (let c = 0; c <= Math.ceil(W / cw); c++) {
@@ -106,8 +106,18 @@ function paintGrid(g: CanvasRenderingContext2D, W: number, H: number, cw: number
   g.stroke();
 }
 
+/** A scene's own page colour and grid-line colour, whether to use the sharks' bigger cells, and drop shadows. */
+export interface Backdrop {
+  bg: string;
+  grid: string;
+  big?: boolean;
+  /** Off on a coloured page, where shadow cells read as dark boxes. */
+  shadows?: boolean;
+}
+
 export class Renderer {
   time = 0;
+  backdrop: Backdrop = { bg: "#000", grid: "rgba(255,255,255,0.055)" };
   private ctx: CanvasRenderingContext2D;
   private bg: HTMLCanvasElement;
   private dpr = 1;
@@ -164,7 +174,7 @@ export class Renderer {
     this.width = width;
     this.height = height;
     this.dpr = dpr;
-    this.cw = clamp(Math.round(width / 150), 7, 11);
+    this.cw = this.backdrop.big ? clamp(Math.round(width / 124), 8, 13) : clamp(Math.round(width / 150), 7, 11);
     this.ch = Math.round(this.cw * 1.45);
     this.cols = Math.ceil(width / this.cw);
     this.rows = Math.ceil(height / this.ch);
@@ -186,9 +196,9 @@ export class Renderer {
     if (!g) return;
     const { width: W, height: H, dpr, cw, ch } = this;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.fillStyle = "#000";
+    g.fillStyle = this.backdrop.bg;
     g.fillRect(0, 0, W, H);
-    paintGrid(g, W, H, cw, ch, dpr);
+    paintGrid(g, W, H, cw, ch, dpr, this.backdrop.grid);
     if (!ground) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.setFont(g);
@@ -215,6 +225,15 @@ export class Renderer {
     this.mode[i] = fill ? 1 : 2;
     this.ink[i] = pack(ink[0], ink[1], ink[2]);
     if (fill) this.fill[i] = pack(fill[0], fill[1], fill[2]);
+    this.glyph[i] = g.charCodeAt(0);
+  }
+
+  /** Draw a glyph over whatever is in a cell, keeping any block behind it (a ripple passing over a koi). */
+  overlay(col: number, row: number, g: string, ink: RGB) {
+    if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return;
+    const i = row * this.cols + col;
+    if (!this.mode[i]) this.mode[i] = 2;
+    this.ink[i] = pack(ink[0], ink[1], ink[2]);
     this.glyph[i] = g.charCodeAt(0);
   }
 
@@ -457,8 +476,9 @@ export class Renderer {
     ctx.drawImage(this.bg, 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "rgba(0,0,0,0.6)";
+    const shadows = this.backdrop.shadows !== false;
     for (let i = 0; i < mode.length; i++) {
-      if (shadow[i] && !mode[i]) ctx.fillRect((i % cols) * cw, ((i / cols) | 0) * ch, cw, ch);
+      if (shadows && shadow[i] && !mode[i]) ctx.fillRect((i % cols) * cw, ((i / cols) | 0) * ch, cw, ch);
     }
     this.setFont(ctx);
     for (let i = 0; i < mode.length; i++) {

@@ -1,16 +1,17 @@
 {
-  "name": "ascii-bugs",
+  "name": "ascii-collection",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "check": "esbuild check.ts --bundle --platform=node --log-level=warning | node"
   },
   "devDependencies": {
+    "esbuild": "^0.25.12",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"
   }

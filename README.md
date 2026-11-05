@@ -1,4 +1,4 @@
-# ascii bugs
+# ascii collection
 
 ```
                 \\
@@ -25,51 +25,52 @@
                 /
 ```
 
-Insects drawn as ASCII on a canvas, in the style of
-[ascii-sharks](https://github.com/stackedlol/ascii-sharks). Zero runtime dependencies.
-Three versions, each in colour or in the sharks' grey with flickering rainbow glyphs (the
-**color / grey** switch at the top). Like the sharks, the bugs aren't fenced in: they dip past
-the edges, and now and then leave the scene altogether and come back in somewhere else.
+Living ASCII scenes drawn on a canvas, in the style of
+[ascii-sharks](https://github.com/stackedlol/ascii-sharks). Each page is just the scene:
+no text, buttons or HUD.
 
-- **moths** (`#moths`): atlas, luna, polyphemus, death's-head hawkmoth and rosy maple
-  moths. The **fly / crawl** switch has them either fly with beating wings or land, fold
-  their wings and walk in short bursts on six legs, now and then fluttering off to land
-  somewhere else. **lamp** and **cursor light** switch the two lights on and off: flying
-  moths circle the nearest one (click to move the lamp; the cursor light is a second lamp
-  that follows your mouse), and with no light they roam in and out of the scene. Clicking a perched moth makes it flash its wings open to show its eyespots.
-- **beetles** (`#beetles`): flower chafer, goliath, stag, rhinoceros, hercules, jewel
-  beetle and ladybird. Like the sharks, they never stop: each walks its own lazy loop
-  round the scene, wide enough to carry it out past the edges and back. Swarms of gnats
-  drift through like the sharks' fish, darting away from the cursor and bursting apart
-  where you click. Click a beetle to startle it: the wing cases lift, the hindwings unfold
-  and it flies off.
-- **ants** (`#ants`): detailed ants (mandibles, elbowed antennae, a segmented gaster, six
-  legs in a tripod gait) exploring on long looping paths in and out of the scene. Click to
-  drop food: explorers smell it, bite off crumbs, carry them straight home to the nest and
-  lay a pheromone trail that others follow. Ants that meet stop to touch antennae.
+## Insects
+
+| Page | |
+| --- | --- |
+| `insects/moths-fly-color.html`, `insects/moths-fly-grey.html` | Atlas, luna, polyphemus, death's-head and rosy maple moths circling a lamp; your cursor is a second lamp. Click to move the lamp. |
+| `insects/moths-crawl-color.html`, `insects/moths-crawl-grey.html` | The same moths perched and walking, now and then fluttering off. Click one to make it flash its wings. |
+| `insects/beetles-color.html`, `insects/beetles-grey.html` | Flower chafer, goliath, stag, rhinoceros, hercules, jewel beetle and ladybird walking their loops in and out of the scene, with gnat swarms drifting over. Click a beetle to startle it into flight. |
+| `insects/ants-color.html`, `insects/ants-grey.html` | Detailed ants exploring in and out of the scene. Click to drop food; they carry it home along a pheromone trail. |
+
+The grey versions use the sharks' blue-grey with flickering rainbow glyphs.
+
+## Nature
+
+| Page | |
+| --- | --- |
+| `nature/leaves.html` | Maple, oak, birch and ginkgo leaves tumbling down an autumn grid. |
+| `nature/pond.html` | A koi pond from above. Click the water to ripple it and scatter food for the koi. Sakura petals fall and ripple the surface, lily pads float, gnats drift and a dragonfly comes by now and then. |
+
+## Use
 
 ```sh
-npm install && npm run dev
+npm install
+npm run dev     # then open e.g. http://localhost:5173/nature/pond.html
+npm run build   # dist/ gets one self-contained HTML file per page: open it with a double-click
 ```
 
-Then open http://localhost:5173/ and pick a bug at the top (or go straight to `#moths`, `#beetles`, `#ants`). Other options:
+`npm run typecheck` checks types; `npm run check` runs every scene headless and checks its
+behaviour (ants forage, beetles keep walking, moths circle the lamp and land, leaves keep
+falling, koi eat, petals land, the dragonfly visits, and bugs that leave come back).
 
-- `?mode=crawl#moths` starts the moths perched.
-- `?kinds=stag,hercules#beetles` or `?kinds=luna,atlas#moths` picks the roster.
+## Layout
 
-```ts
-import { AntScene, BugEngine } from "./src";
-
-const engine = new BugEngine(canvas, new AntScene());
-// new MothScene(["luna", "atlas"], "crawl") · new BeetleScene(["stag", "rhino"])
+```
+src/core/      engine (loop, resize, input), renderer (supersampled ASCII cells), math, anatomy
+src/insects/   moths, beetles, ants, gnats, dragonfly
+src/nature/    leaves, pond, koi
+src/main.ts    starts the scene a page names on its canvas, e.g.
+               <canvas data-scene="moths" data-mode="crawl" data-look="grey">
+insects/, nature/   the pages
 ```
 
-`npm run typecheck` checks types. `npm run check` runs the three simulations headless and
-checks that ants forage, beetles keep walking, fly and land and their gnats stay in swarms,
-moths circle the lamp or roam with it off, land and flash their wings, and that bugs leave
-the scene and come back in.
+A new scene is a class implementing `Scene` (`src/core/engine.ts`) plus a page that names it.
 
-Respects `prefers-reduced-motion` (it draws a single still frame) and pauses when off-screen.
-
-`src/engine.ts` and `src/math.ts` are adapted from ascii-sharks (MIT, © 2026 drewdi); see
-`LICENSE-ascii-sharks`.
+`src/core/engine.ts` and `src/core/math.ts` are adapted from ascii-sharks (MIT, © 2026 drewdi);
+see `LICENSE-ascii-sharks`.

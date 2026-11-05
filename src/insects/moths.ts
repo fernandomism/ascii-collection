@@ -10,10 +10,10 @@
  *          short bursts on six legs. A cursor near one freezes it; clicking
  *          one makes it flash its wings open to show its eyespots.
  */
-import { limb, mix, scale, SIDES, tripod } from "./anatomy";
-import type { Scene } from "./engine";
-import { beyondEdge, clamp, edgePull, hash3, outside, rand, reenter, steer, TAU } from "./math";
-import { FUZZ, WING, type Figure, type Paint, type Part, type Renderer, type RGB, type Stroke } from "./render";
+import { limb, mix, scale, SIDES, tripod } from "../core/anatomy";
+import type { Scene } from "../core/engine";
+import { beyondEdge, clamp, edgePull, hash3, outside, rand, reenter, steer, TAU } from "../core/math";
+import { FUZZ, WING, type Figure, type Paint, type Part, type Renderer, type RGB, type Stroke } from "../core/render";
 
 export type MothKind = "luna" | "rosy" | "polyphemus" | "atlas" | "deathshead";
 export type MothMode = "fly" | "crawl";

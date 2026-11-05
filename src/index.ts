@@ -1,5 +1,7 @@
-export { BugEngine, type Scene } from "./engine";
-export { Renderer } from "./render";
-export { MothScene, type MothKind, type MothMode } from "./moths";
-export { BeetleScene, type BeetleKind } from "./beetles";
-export { AntScene } from "./ants";
+export { BugEngine, type Scene } from "./core/engine";
+export { Renderer, type Backdrop } from "./core/render";
+export { MothScene, type MothKind, type MothMode } from "./insects/moths";
+export { BeetleScene, type BeetleKind } from "./insects/beetles";
+export { AntScene } from "./insects/ants";
+export { LeavesScene } from "./nature/leaves";
+export { PondScene } from "./nature/pond";

@@ -4,8 +4,8 @@
  * a leader that drifts on its own loop through the scene, in and out of view.
  * They dart away from the cursor and burst apart where you click.
  */
-import { clamp, patrol, rand, reenter, steer, TAU } from "./math";
-import type { Renderer, RGB } from "./render";
+import { clamp, patrol, rand, reenter, steer, TAU } from "../core/math";
+import type { Renderer, RGB } from "../core/render";
 
 interface Gnat {
   x: number;

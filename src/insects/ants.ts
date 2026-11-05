@@ -6,10 +6,10 @@
  * it straight home to the nest, laying a pheromone trail that other explorers
  * follow back out to the food. Ants that meet stop to touch antennae.
  */
-import { limb, mix, scale, SIDES, tripod } from "./anatomy";
-import type { Scene } from "./engine";
-import { clamp, hash3, patrol, rand, reenter, steer, TAU } from "./math";
-import type { Figure, Part, Renderer, RGB, Stroke } from "./render";
+import { limb, mix, scale, SIDES, tripod } from "../core/anatomy";
+import type { Scene } from "../core/engine";
+import { clamp, hash3, patrol, rand, reenter, steer, TAU } from "../core/math";
+import type { Figure, Part, Renderer, RGB, Stroke } from "../core/render";
 
 const HEAD: RGB = [198, 86, 46];
 const THORAX: RGB = [188, 80, 44];

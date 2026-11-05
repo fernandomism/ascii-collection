@@ -1,7 +1,9 @@
 // Headless sanity check of the three sims (no canvas): npm run check
-import { AntScene } from "./src/ants";
-import { BeetleScene } from "./src/beetles";
-import { MothScene } from "./src/moths";
+import { AntScene } from "./src/insects/ants";
+import { BeetleScene } from "./src/insects/beetles";
+import { MothScene } from "./src/insects/moths";
+import { LeavesScene } from "./src/nature/leaves";
+import { PondScene } from "./src/nature/pond";
 
 const ok = (cond: unknown, what: string) => {
   if (!cond) throw new Error(`check failed: ${what}`);
@@ -91,6 +93,40 @@ moths.click(perched.x, perched.y);
 run(moths, 0.5);
 ok(perched.flash > 0.9, "clicked moth flashed its wings open");
 run(moths, 60, track(moths.moths));
+
+// Leaves: they keep falling, and each one that drops out the bottom comes back in at the top.
+const leaves = new LeavesScene();
+leaves.resize(W, H);
+const fallen = new Map<object, number>();
+let refilled = 0;
+run(leaves, 60, () => {
+  for (const l of leaves.leaves) {
+    if (l.y < (fallen.get(l) ?? -Infinity) - H * 0.5) refilled++;
+    fallen.set(l, l.y);
+  }
+});
+ok(refilled > leaves.leaves.length, "leaves keep falling and come back in at the top");
+ok(leaves.leaves.every((l) => l.y < H + l.L * 2 && l.x > -l.L * 2 && l.x < W + l.L * 2), "leaves stay in or near the scene");
+
+// Pond: a click ripples the water and drops food the koi eat; petals land with a ripple;
+// a dragonfly comes by; koi that swim out of view come back.
+const pond = new PondScene();
+pond.resize(W, H, 12, 17);
+pond.click(W / 2, H / 2);
+ok(pond.ripples.length === 1 && pond.food.length === 6, "a click ripples the water and drops food");
+let landings = 0;
+let visited = false;
+let prevFloating = pond.petals.filter((p) => p.z === 0).length;
+run(pond, 30, () => {
+  track(pond.koi)();
+  const floating = pond.petals.filter((p) => p.z === 0).length;
+  if (floating > prevFloating) landings++;
+  prevFloating = floating;
+  visited ||= pond.dragonfly.state !== "away";
+});
+ok(pond.food.length < 6, "koi ate some of the food");
+ok(landings > 0, "petals landed on the water");
+ok(visited, "a dragonfly came by");
 
 ok(stray < 2, `bugs that wander off-screen come back (strayed ${stray.toFixed(2)} L)`);
 console.log(`ok (furthest off-screen: ${stray.toFixed(2)} body lengths)`);
