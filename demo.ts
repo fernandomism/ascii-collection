@@ -10,11 +10,14 @@ const modes = document.getElementById("modes")!;
 const modeButtons = modes.querySelectorAll<HTMLButtonElement>("button");
 
 const lookButtons = document.querySelectorAll<HTMLButtonElement>("#looks button");
+const lights = document.getElementById("lights")!;
+const lightButtons = lights.querySelectorAll<HTMLButtonElement>("button");
 
 let engine: BugEngine | undefined;
 let moths: MothScene | undefined;
 let ticker = 0;
 let grey = false;
+const lit = { lamp: true, cursor: true };
 
 function setLook(on: boolean) {
   grey = on;
@@ -25,8 +28,22 @@ function setLook(on: boolean) {
 function setMode(mode: MothMode) {
   if (!moths) return;
   moths.setMode(mode);
-  hint.textContent = mode === "fly" ? "click to move the lamp" : "click a moth to startle it";
   for (const b of modeButtons) b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+  setLights();
+}
+
+/** Apply the lamp / cursor-light switches to the moths and the buttons. */
+function setLights() {
+  if (!moths) return;
+  moths.lampOn = lit.lamp;
+  moths.cursorLight = lit.cursor;
+  for (const b of lightButtons) {
+    const on = lit[b.dataset.light as keyof typeof lit];
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = `[${on ? "x" : " "}] ${b.dataset.light === "lamp" ? "lamp" : "cursor light"}`;
+  }
+  hint.textContent =
+    moths.mode === "crawl" ? "click a moth to startle it" : lit.lamp ? "click to move the lamp" : "no lamp: the moths roam";
   engine?.refresh();
 }
 
@@ -53,7 +70,7 @@ function show() {
   } else {
     scene = moths = new MothScene(kinds as MothKind[] | undefined, params.get("mode") === "crawl" ? "crawl" : "fly");
   }
-  modes.hidden = !moths;
+  modes.hidden = lights.hidden = !moths;
   engine = new BugEngine(canvas, scene);
   if (grey) engine.setGrey(true);
   if (moths) setMode(moths.mode);
@@ -61,5 +78,12 @@ function show() {
 
 for (const b of modeButtons) b.addEventListener("click", () => setMode(b.dataset.mode as MothMode));
 for (const b of lookButtons) b.addEventListener("click", () => setLook(b.dataset.look === "grey"));
+for (const b of lightButtons) {
+  b.addEventListener("click", () => {
+    const k = b.dataset.light as keyof typeof lit;
+    lit[k] = !lit[k];
+    setLights();
+  });
+}
 window.addEventListener("hashchange", show);
 show();

@@ -48,6 +48,10 @@ export const WING = ".:-=+*%#";
 const EDGE_HEAVY = ":;";
 const EDGE_LIGHT = ".',`";
 const ACCENTS: RGB[] = [[90, 235, 150], [80, 200, 255], [255, 214, 90], [225, 100, 255]];
+// The sharks' rainbow: glyphs that flash these colours on the grey hide.
+const RAINBOW: RGB[] = [[224, 137, 44], [224, 58, 50], [180, 74, 224], [51, 200, 204], [60, 181, 74], [49, 80, 232], [217, 193, 74]];
+/** Low bit on a packed colour: keep it in colour even in grey mode (pack() always clears it). */
+const KEEP = 1;
 // Key light from the top-left, a little above; H is the specular half-vector.
 const LX = -0.45;
 const LY = -0.6;
@@ -324,8 +328,13 @@ export class Renderer {
           fill[i] = pack(cr, cg, cb);
           // Glyph density follows the lighting, not the paint, so spots and stripes stay clean.
           glyph[i] = ramp.charCodeAt(clamp(Math.floor((1 - shade) * (ramp.length - 0.01)) + jitter, 0, ramp.length - 1));
+          // Colours re-roll on a staggered clock so the hide shimmers.
+          const roll = hash3(key, Math.floor(tick + (key % 997) / 97), 7);
           if (spec > 0.35) {
             ink[i] = pack(255, 255, 248);
+          } else if (this.grey && roll < 0.13) {
+            const a = roll < 0.09 ? RAINBOW[key % RAINBOW.length] : ([255, 255, 255] as RGB);
+            ink[i] = pack(a[0], a[1], a[2]) | KEEP;
           } else if (p.shimmer && hash3(key, Math.floor(tick + (key % 997) / 97), 7) < p.shimmer) {
             const a = ACCENTS[key % ACCENTS.length];
             ink[i] = pack(a[0], a[1], a[2]);
@@ -342,7 +351,9 @@ export class Renderer {
           // Soft, anti-aliased silhouette: no block, just a light glyph.
           const set = hits >= 3 ? EDGE_HEAVY : EDGE_LIGHT;
           mode[i] = 2;
-          ink[i] = pack(cr * 0.9 + 10, cg * 0.9 + 10, cb * 0.9 + 10);
+          const roll = hash3(key, Math.floor(tick + (key % 997) / 97), 7);
+          const a = RAINBOW[key % RAINBOW.length];
+          ink[i] = this.grey && roll < 0.07 ? pack(a[0], a[1], a[2]) | KEEP : pack(cr * 0.9 + 10, cg * 0.9 + 10, cb * 0.9 + 10);
           glyph[i] = set.charCodeAt((key >>> 8) % set.length);
         }
       }
@@ -480,12 +491,12 @@ export class Renderer {
     let s = this.styles.get(p);
     if (!s) {
       let q = p;
-      if (this.grey) {
+      if (this.grey && !(p & KEEP)) {
         // Lift the darks (brown ants would otherwise sink into the black), keep the lights.
         const l = 255 * ((0.3 * (p >> 16) + 0.59 * ((p >> 8) & 255) + 0.11 * (p & 255)) / 255) ** 0.7;
         q = pack(l * 0.94, l * 0.98, l * 1.05 + 4);
       }
-      s = "#" + q.toString(16).padStart(6, "0");
+      s = "#" + (q & ~KEEP).toString(16).padStart(6, "0");
       this.styles.set(p, s);
     }
     return s;

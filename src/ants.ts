@@ -9,7 +9,7 @@
  */
 import { limb, mix, scale, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, edgePull, hash3, rand, steer, TAU } from "./math";
+import { beyondEdge, clamp, edgePull, hash3, rand, reenter, steer, TAU } from "./math";
 import type { Figure, Part, Renderer, RGB, Stroke } from "./render";
 
 const HEAD: RGB = [198, 86, 46];
@@ -61,6 +61,9 @@ interface Ant {
   greetAt: number;
   /** Give up exploring and head home at this time. */
   homeAt: number;
+  /** A foraging trip out past the edge of the screen, and when to start the next one. */
+  trip: [number, number] | null;
+  tripAt: number;
 }
 
 const gasterPaint = (u: number, v: number): RGB => {
@@ -243,6 +246,8 @@ export class AntScene implements Scene {
       pauseUntil: 0,
       greetAt: this.time + 3,
       homeAt: this.time + rand(20, 35),
+      trip: null,
+      tripAt: this.time + rand(5, 20),
     });
     // Smaller ants draw first so the big ones walk over them.
     this.ants.sort((p, q) => p.L - q.L);
@@ -345,13 +350,23 @@ export class AntScene implements Scene {
           dx += ((a.x - nest.x) / nd) * 0.8;
           dy += ((a.y - nest.y) / nd) * 0.8;
         }
-        if (time > a.homeAt) a.state = "home";
+        if (time > a.tripAt && !a.trip) a.trip = beyondEdge(this.W, this.H, L * 1.5);
+        if (a.trip) {
+          const tx = a.trip[0] - a.x;
+          const ty = a.trip[1] - a.y;
+          const d = Math.hypot(tx, ty) || 1;
+          dx += (tx / d) * 2.5;
+          dy += (ty / d) * 2.5;
+        } else if (time > a.homeAt) {
+          a.state = "home";
+        }
       }
     }
-
-    const [ex, ey] = edgePull(a.x, a.y, this.W, this.H, L);
-    dx += ex;
-    dy += ey;
+    if (!a.trip) {
+      const [ex, ey] = edgePull(a.x, a.y, this.W, this.H, L);
+      dx += ex;
+      dy += ey;
+    }
 
     a.heading = steer(a.heading, Math.atan2(dy, dx), 2.8 * dt);
     const cruise = (52 + L * 0.18) * (a.carry ? 0.85 : 1);
@@ -359,6 +374,12 @@ export class AntScene implements Scene {
     a.x += Math.cos(a.heading) * a.speed * dt;
     a.y += Math.sin(a.heading) * a.speed * dt;
     a.gait += ((a.speed * dt) / (L * 0.3)) * Math.PI;
+    // Out of sight: the forager comes back in somewhere else and heads home.
+    if (reenter(a, this.W, this.H)) {
+      a.trip = null;
+      a.tripAt = time + rand(12, 30);
+      a.state = "home";
+    }
   }
 
   /** Keep bodies apart, and let ants that bump heads stop to touch antennae. */

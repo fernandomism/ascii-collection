@@ -29,6 +29,7 @@
       nav a:hover, nav button:hover, nav a[aria-current="page"], nav button[aria-pressed="true"] { color: var(--ui-on); }
       nav a:focus-visible, nav button:focus-visible { outline: 1px solid var(--ui-on); outline-offset: 2px; }
       #hint { color: var(--ui-dim); }
+      #lights:not([hidden]) { display: inline-flex; gap: 14px; }
     </style>
   </head>
   <body>
@@ -44,6 +45,10 @@
       <span id="modes" role="group" aria-label="Moth mode" hidden>
         <button type="button" data-mode="fly" aria-pressed="false">fly</button> /
         <button type="button" data-mode="crawl" aria-pressed="false">crawl</button>
+      </span>
+      <span id="lights" role="group" aria-label="Moth lights" hidden>
+        <button type="button" data-light="lamp" aria-pressed="true">[x] lamp</button>
+        <button type="button" data-light="cursor" aria-pressed="true">[x] cursor light</button>
       </span>
       <span id="hint" aria-live="off"></span>
     </nav>

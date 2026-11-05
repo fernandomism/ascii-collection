@@ -27,14 +27,16 @@
 
 Insects drawn as ASCII on a canvas, in the style of
 [ascii-sharks](https://github.com/stackedlol/ascii-sharks). Zero runtime dependencies.
-Three versions, each in colour or in the sharks' grey (the **color / grey** switch at the top).
-Like the sharks, the bugs aren't fenced in: they wander off the edges of the screen and come back.
+Three versions, each in colour or in the sharks' grey with flickering rainbow glyphs (the
+**color / grey** switch at the top). Like the sharks, the bugs aren't fenced in: they dip past
+the edges, and now and then leave the scene altogether and come back in somewhere else.
 
 - **moths** (`#moths`): atlas, luna, polyphemus, death's-head hawkmoth and rosy maple
-  moths around a lamp. The **fly / crawl** switch has them either circle the light with
-  beating wings (clicking moves the lamp; the cursor is a second, weaker light) or land,
-  fold their wings and walk in short bursts on six legs. Clicking a perched moth makes it
-  flash its wings open and show its eyespots.
+  moths. The **fly / crawl** switch has them either fly with beating wings or land, fold
+  their wings and walk in short bursts on six legs, now and then fluttering off to land
+  somewhere else. **lamp** and **cursor light** switch the two lights on and off: with the
+  lamp on, flying moths circle it (click to move it); with no light they roam in and out
+  of the scene. Clicking a perched moth makes it flash its wings open to show its eyespots.
 - **beetles** (`#beetles`): flower chafer, goliath, stag, rhinoceros, hercules, jewel
   beetle and ladybird. Horned males seek each other out and lock horns until one backs
   off. Click a beetle to startle it: the wing cases lift, the hindwings unfold and it
@@ -42,7 +44,8 @@ Like the sharks, the bugs aren't fenced in: they wander off the edges of the scr
 - **ants** (`#ants`): big, detailed ants (mandibles, elbowed antennae, a segmented
   gaster, six legs in a tripod gait). Click to drop food. Foragers smell it, bite off
   crumbs, carry them straight home and lay a pheromone trail that others follow. Ants
-  that meet stop to touch antennae, and every 5 crumbs stored hatch another ant.
+  that meet stop to touch antennae, and every 5 crumbs stored hatch another ant. With no
+  food about, foragers set off out of the scene and later walk back in to the nest.
 
 ```sh
 npm install && npm run dev
@@ -62,7 +65,8 @@ const engine = new BugEngine(canvas, new AntScene());
 
 `npm run typecheck` checks types. `npm run check` runs the three simulations headless and
 checks that ants forage and the colony grows, beetles fight, fly and land, moths
-circle the lamp, land and flash their wings, and that bugs that wander off-screen come back.
+circle the lamp or roam with it off, land and flash their wings, and that bugs leave the
+scene and come back in.
 
 Respects `prefers-reduced-motion` (it draws a single still frame) and pauses when off-screen.
 

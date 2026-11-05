@@ -9,7 +9,7 @@
  */
 import { dotted, limb, mix, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, edgePull, hash3, rand, smoothstep, steer, TAU } from "./math";
+import { beyondEdge, clamp, edgePull, hash3, rand, reenter, smoothstep, steer, TAU } from "./math";
 import type { Figure, Paint, Part, Renderer, RGB, Stroke } from "./render";
 
 export type BeetleKind = "flower" | "goliath" | "stag" | "rhino" | "hercules" | "jewel" | "ladybug";
@@ -61,6 +61,9 @@ interface Beetle {
   fleeUntil: number;
   /** No new fights before this. */
   calmAt: number;
+  /** A walk out past the edge of the screen, and when to start the next one. */
+  trip: [number, number] | null;
+  tripAt: number;
 }
 
 const BLACK: RGB = [34, 30, 30];
@@ -84,7 +87,7 @@ const LEGS = [
 const LOOKS: Record<BeetleKind, Look> = {
   // Rose chafer: compact metallic green, white flecks toward the rear.
   flower: {
-    scale: 0.6, speed: 0.22, fighter: false,
+    scale: 0.6, speed: 0.31, fighter: false,
     head: [0.31, 0.06, 0.075], pron: [0.19, 0.1, 0.16], ely: [-0.13, 0.3, 0.115],
     headPaint: [50, 140, 70], pronPaint: [56, 160, 78],
     elyPaint: (u, v) =>
@@ -93,7 +96,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Goliath: striped white-and-black pronotum, chestnut wing cases edged in white, a short Y horn.
   goliath: {
-    scale: 1, speed: 0.14, fighter: false,
+    scale: 1, speed: 0.2, fighter: false,
     head: [0.34, 0.065, 0.085], pron: [0.21, 0.12, 0.19], ely: [-0.15, 0.33, 0.13],
     headPaint: BLACK,
     pronPaint: (_u, v) => {
@@ -109,7 +112,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Stag beetle: a wide head carrying antler-like jaws, chestnut wing cases.
   stag: {
-    scale: 1.1, speed: 0.16, fighter: true,
+    scale: 1.1, speed: 0.22, fighter: true,
     head: [0.27, 0.085, 0.15], pron: [0.12, 0.095, 0.16], ely: [-0.22, 0.3, 0.11],
     headPaint: [62, 36, 28], pronPaint: [58, 34, 28], elyPaint: () => [128, 60, 36],
     under: [50, 30, 24], leg: [110, 70, 50], gloss: 0.5, antenna: "elbow",
@@ -141,7 +144,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Japanese rhinoceros beetle: one long head horn forked at the tip, a nub on the pronotum.
   rhino: {
-    scale: 1, speed: 0.14, fighter: true,
+    scale: 1, speed: 0.2, fighter: true,
     head: [0.3, 0.065, 0.09], pron: [0.17, 0.13, 0.2], ely: [-0.17, 0.33, 0.13],
     headPaint: [92, 44, 30], pronPaint: [96, 46, 30], elyPaint: () => [116, 58, 36],
     under: [60, 32, 24], leg: [120, 66, 44], gloss: 0.8, antenna: "club",
@@ -155,7 +158,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   // Hercules beetle: glossy black front, a huge pronotal horn with a golden-haired underside,
   // and olive wing cases with black spots.
   hercules: {
-    scale: 1.25, speed: 0.13, fighter: true,
+    scale: 1.25, speed: 0.18, fighter: true,
     head: [0.28, 0.055, 0.08], pron: [0.17, 0.13, 0.19], ely: [-0.18, 0.34, 0.135],
     headPaint: BLACK, pronPaint: [40, 38, 40],
     elyPaint: (u, v) => (dotted(u, v, 0.34, 0.42, 3, 0.32) ? [44, 38, 30] : [188, 168, 98]),
@@ -172,7 +175,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Jewel beetle: slim and bullet-shaped, iridescent green running to copper, a red stripe.
   jewel: {
-    scale: 0.75, speed: 0.25, fighter: false,
+    scale: 0.75, speed: 0.35, fighter: false,
     head: [0.33, 0.045, 0.07], pron: [0.24, 0.08, 0.11], ely: [-0.15, 0.37, 0.085],
     headPaint: [40, 150, 110], pronPaint: (u) => mix([30, 160, 120], [200, 120, 50], (1 - u) * 0.3),
     elyPaint: (u, v) => {
@@ -183,7 +186,7 @@ const LOOKS: Record<BeetleKind, Look> = {
   },
   // Seven-spot ladybird.
   ladybug: {
-    scale: 0.6, speed: 0.3, fighter: false,
+    scale: 0.6, speed: 0.42, fighter: false,
     head: [0.25, 0.05, 0.09], pron: [0.18, 0.07, 0.17], ely: [-0.06, 0.27, 0.2],
     headPaint: BLACK, pronPaint: (u, v) => (Math.abs(v) > 0.55 && u > -0.3 ? [232, 230, 222] : BLACK),
     elyPaint: (u, v) => {
@@ -290,7 +293,7 @@ export class BeetleScene implements Scene {
         id: i + 1, kind, look, x, y, heading: rand(0, TAU), speed: 0, L,
         gait: rand(0, TAU), wander: 0, feel: rand(0, TAU),
         walkUntil: rand(2, 6), pauseUntil: 0, open: 0, lift: 0, flap: 0, flyUntil: 0,
-        rival: null, sparUntil: 0, fleeUntil: 0, calmAt: rand(4, 10),
+        rival: null, sparUntil: 0, fleeUntil: 0, calmAt: rand(4, 10), trip: null, tripAt: rand(10, 40),
       };
       this.beetles.push(b);
     });
@@ -359,7 +362,12 @@ export class BeetleScene implements Scene {
         b.wander = clamp(b.wander + (Math.random() - 0.5) * dt * 2.5, -0.7, 0.7);
         dx += Math.cos(b.heading + b.wander) * 0.5;
         dy += Math.sin(b.heading + b.wander) * 0.5;
-        if (b.look.fighter && time > b.calmAt && !fleeing) {
+        if (!b.trip && time > b.tripAt) b.trip = beyondEdge(W, H, L * 1.5);
+        if (b.trip) {
+          const d = Math.hypot(b.trip[0] - b.x, b.trip[1] - b.y) || 1;
+          dx += ((b.trip[0] - b.x) / d) * 2;
+          dy += ((b.trip[1] - b.y) / d) * 2;
+        } else if (b.look.fighter && time > b.calmAt && !fleeing) {
           // Seek out another calm fighter nearby.
           for (const o of this.beetles) {
             if (o === b || !o.look.fighter || o.rival || o.lift > 0 || time < o.calmAt) continue;
@@ -373,15 +381,20 @@ export class BeetleScene implements Scene {
         target = time < b.pauseUntil && !fleeing ? 0 : b.look.speed * L * (fleeing ? 2.2 : 1);
       }
 
-      const [ex, ey] = edgePull(b.x, b.y, W, H, L);
-      dx += ex;
-      dy += ey;
-
+      if (!b.trip && b.lift === 0) {
+        const [ex, ey] = edgePull(b.x, b.y, W, H, L);
+        dx += ex;
+        dy += ey;
+      }
       b.heading = steer(b.heading, Math.atan2(dy, dx), turn * dt);
       b.speed += (target - b.speed) * Math.min(1, dt * 3);
       b.x += Math.cos(b.heading) * b.speed * dt;
       b.y += Math.sin(b.heading) * b.speed * dt;
       b.gait += ((Math.abs(b.speed) * dt) / (L * 0.28)) * Math.PI * (b.lift > 0.1 ? 0 : 1);
+      if (reenter(b, W, H)) {
+        b.trip = null;
+        b.tripAt = time + rand(35, 70);
+      }
     }
     this.collide();
   }

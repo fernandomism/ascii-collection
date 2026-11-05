@@ -12,7 +12,7 @@
  */
 import { limb, mix, scale, SIDES, tripod } from "./anatomy";
 import type { Scene } from "./engine";
-import { clamp, edgePull, hash3, rand, steer, TAU } from "./math";
+import { beyondEdge, clamp, edgePull, hash3, outside, rand, reenter, steer, TAU } from "./math";
 import { FUZZ, WING, type Figure, type Paint, type Part, type Renderer, type RGB, type Stroke } from "./render";
 
 export type MothKind = "luna" | "rosy" | "polyphemus" | "atlas" | "deathshead";
@@ -179,6 +179,10 @@ interface Moth {
   takeoffAt: number;
   restUntil: number;
   walkUntil: number;
+  /** Where it's flying when no light holds it: across the scene, out of it, or (perched mode) to land. */
+  trip: [number, number] | null;
+  /** When a perched moth next flutters off somewhere else. */
+  hopAt: number;
 }
 
 /** A tiny moth: one glyph fluttering round the lamp. */
@@ -238,6 +242,10 @@ export class MothScene implements Scene {
   motes: Mote[] = [];
   /** Lamp position as a fraction of the canvas, so it survives resizes. */
   lamp = { fx: 0.5, fy: 0.45 };
+  /** Flying moths are drawn to the lamp; off, they roam in and out of the scene. */
+  lampOn = true;
+  /** The cursor is a second light. */
+  cursorLight = true;
   private W = 0;
   private H = 0;
   private cw = 10;
@@ -253,9 +261,14 @@ export class MothScene implements Scene {
     this.mode = mode;
     for (const m of this.moths) {
       m.takeoffAt = this.time + rand(0, 1.5);
-      // Moths out on a wide swing come back in to land.
-      if (mode === "crawl") m.orbitR = Math.min(m.orbitR, 0.42 * Math.min(this.W, this.H) + m.L * 0.35);
+      m.hopAt = this.time + rand(20, 45);
+      // Landing: moths out of sight fly back in first; the rest come down where they are.
+      m.trip = mode === "crawl" && outside(m.x, m.y, this.W, this.H) > 0 ? this.landingSpot() : null;
     }
+  }
+
+  private landingSpot(): [number, number] {
+    return [rand(0.15, 0.85) * this.W, rand(0.15, 0.85) * this.H];
   }
 
   private get lx() {
@@ -295,7 +308,7 @@ export class MothScene implements Scene {
         y: flying ? this.ly + Math.sin(a) * r : rand(L * 0.4, H - L * 0.4),
         heading: a + Math.PI / 2, flapPhase: rand(0, TAU), wander: 0,
         orbit: Math.random() < 0.5 ? 1 : -1, orbitR: 0, gait: rand(0, TAU), feel: rand(0, TAU),
-        takeoffAt: 0, restUntil: 0, walkUntil: rand(1, 4),
+        takeoffAt: 0, restUntil: 0, walkUntil: rand(1, 4), trip: null, hopAt: rand(10, 40),
       };
       m.orbitR = this.pickOrbit(m);
       return m;
@@ -316,13 +329,13 @@ export class MothScene implements Scene {
     // Mostly loops round the lamp; sometimes a dive at the bulb, or a wide swing out past the edges.
     const r = Math.random();
     if (r < 0.2) return m.L * 0.35;
-    if (r < 0.35) return rand(0.6, 0.9) * Math.max(this.W, this.H);
+    if (r < 0.4) return rand(0.6, 0.9) * Math.max(this.W, this.H);
     return rand(0.12, 0.42) * Math.min(this.W, this.H) + m.L * 0.35;
   }
 
   click(x: number, y: number) {
     if (this.mode === "fly") {
-      this.lamp = { fx: clamp(x / this.W, 0.05, 0.95), fy: clamp(y / this.H, 0.05, 0.95) };
+      if (this.lampOn) this.lamp = { fx: clamp(x / this.W, 0.05, 0.95), fy: clamp(y / this.H, 0.05, 0.95) };
       return;
     }
     let best: Moth | null = null;
@@ -341,40 +354,55 @@ export class MothScene implements Scene {
     this.time += dt;
     const fly = this.mode === "fly";
     for (const m of this.moths) {
-      // A moth told to land keeps flying until it's back over the screen.
-      const away = m.x < 0 || m.y < 0 || m.x > this.W || m.y > this.H;
-      const up = fly ? this.time >= m.takeoffAt : away && m.lift > 0;
+      // Perched mode: a moth only flies while it has somewhere to go.
+      const up = fly ? this.time >= m.takeoffAt : m.trip !== null;
       m.lift = clamp(m.lift + (up ? dt * 1.2 : -dt * 0.7), 0, 1);
       m.flash = clamp(m.flash + (this.time < m.flashUntil ? dt * 6 : -dt * 3), 0, 1);
       m.flapPhase += dt * (m.lift > 0.01 ? 14 : 0);
       m.feel += dt * 2.2;
       if (m.lift > 0.3) this.flyStep(m, dt);
       else this.crawlStep(m, dt);
+      if (reenter(m, this.W, this.H)) m.trip = fly && this.lampOn ? null : this.landingSpot();
     }
     this.jostle();
     this.stepMotes(dt);
   }
 
+  /** What a flying moth is drawn to: [x, y, orbit radius, is the lamp], or null to roam. */
+  private light(m: Moth): [number, number, number, boolean] | null {
+    const p = this.pointer;
+    if (this.cursorLight && p.active && Math.hypot(p.x - m.x, p.y - m.y) < (this.lampOn ? 260 : 420)) {
+      return [p.x, p.y, m.L * 0.5, false];
+    }
+    return this.lampOn ? [this.lx, this.ly, m.orbitR, true] : null;
+  }
+
   private flyStep(m: Moth, dt: number) {
     const L = m.L;
-    let lx = this.lx;
-    let ly = this.ly;
-    let orbitR = m.orbitR;
-    let lamp = true;
-    const p = this.pointer;
-    if (p.active && Math.hypot(p.x - m.x, p.y - m.y) < 260) {
-      lx = p.x;
-      ly = p.y;
-      orbitR = L * 0.5;
-      lamp = false;
-    }
-    const tx = lx - m.x;
-    const ty = ly - m.y;
-    const d = Math.hypot(tx, ty) || 1;
+    const light = this.mode === "fly" ? this.light(m) : null;
     m.wander = clamp(m.wander + (Math.random() - 0.5) * dt * 10, -1.2, 1.2);
-    // Hold an angle to the light: tangent at the orbit, cutting in from outside, out from inside.
-    const off = clamp((d - orbitR) / orbitR, -1, 1);
-    const want = Math.atan2(ty, tx) + m.orbit * (Math.PI / 2 - 1.1 * off) + m.wander * 0.5;
+    let want: number;
+    let bonked = false;
+    if (light) {
+      const [lx, ly, orbitR, lamp] = light;
+      const d = Math.hypot(lx - m.x, ly - m.y) || 1;
+      const toward = Math.atan2(ly - m.y, lx - m.x);
+      // Hold an angle to the light: tangent at the orbit, cutting in from outside, out from inside.
+      want = toward + m.orbit * (Math.PI / 2 - 1.1 * clamp((d - orbitR) / orbitR, -1, 1));
+      if (lamp && d < this.bulbR + L * 0.15) {
+        // Bonk.
+        m.heading = toward + Math.PI + rand(-0.8, 0.8);
+        m.speed = L * 1.6;
+        m.orbitR = this.pickOrbit(m);
+        bonked = true;
+      }
+    } else {
+      // No light: roam, often right out of the scene. Perched mode: the trip is a landing spot.
+      if (!m.trip && this.mode === "fly") m.trip = Math.random() < 0.5 ? beyondEdge(this.W, this.H, L * 1.5) : this.landingSpot();
+      want = m.trip ? Math.atan2(m.trip[1] - m.y, m.trip[0] - m.x) : m.heading;
+      if (m.trip && Math.hypot(m.trip[0] - m.x, m.trip[1] - m.y) < L * 0.4) m.trip = null;
+    }
+    want += m.wander * 0.5;
     let dx = Math.cos(want);
     let dy = Math.sin(want);
     for (const o of this.moths) {
@@ -388,14 +416,7 @@ export class MothScene implements Scene {
         dy += (oy / od) * (1 - od / min) * 3;
       }
     }
-    if (lamp && d < this.bulbR + L * 0.15) {
-      // Bonk.
-      m.heading = Math.atan2(-ty, -tx) + rand(-0.8, 0.8);
-      m.speed = L * 1.6;
-      m.orbitR = this.pickOrbit(m);
-    } else {
-      m.heading = steer(m.heading, Math.atan2(dy, dx), 4.5 * dt);
-    }
+    if (!bonked) m.heading = steer(m.heading, Math.atan2(dy, dx), 4.5 * dt);
     if (Math.random() < dt * 0.07) m.orbit = m.orbit === 1 ? -1 : 1;
     if (Math.random() < dt * 0.1) m.orbitR = this.pickOrbit(m);
     const target = L * (0.85 + 0.35 * Math.sin(this.time * 1.3 + m.id * 2)) * m.lift;
@@ -415,12 +436,13 @@ export class MothScene implements Scene {
     const spooked = (p.active && Math.hypot(p.x - m.x, p.y - m.y) < L * 0.6) || time < m.flashUntil;
     const resting = time < m.restUntil || spooked;
     m.wander = clamp(m.wander + (Math.random() - 0.5) * dt * 2, -0.6, 0.6);
-    let dx = Math.cos(m.heading + m.wander);
-    let dy = Math.sin(m.heading + m.wander);
+    if (this.mode === "crawl" && time > m.hopAt && !spooked) {
+      // Now and then a perched moth flutters off: across the scene, or out of it.
+      m.trip = Math.random() < 0.5 ? beyondEdge(W, H, L * 1.5) : this.landingSpot();
+      m.hopAt = time + rand(20, 45);
+    }
     const [ex, ey] = edgePull(m.x, m.y, W, H, L);
-    dx += ex;
-    dy += ey;
-    if (!resting) m.heading = steer(m.heading, Math.atan2(dy, dx), 1.2 * dt);
+    if (!resting) m.heading = steer(m.heading, Math.atan2(Math.sin(m.heading + m.wander) + ey, Math.cos(m.heading + m.wander) + ex), 1.2 * dt);
     const target = resting ? 0 : L * 0.07;
     m.speed += (target - m.speed) * Math.min(1, dt * (m.lift > 0 ? 1.5 : 4));
     m.x += Math.cos(m.heading) * m.speed * dt;
@@ -452,36 +474,43 @@ export class MothScene implements Scene {
   }
 
   private stepMotes(dt: number) {
+    const { W, H, pointer: p } = this;
     const fly = this.mode === "fly";
-    const { lx, ly } = this;
+    const light = !fly ? null : this.lampOn ? [this.lx, this.ly] : this.cursorLight && p.active ? [p.x, p.y] : null;
     for (const mo of this.motes) {
-      if (fly) {
-        const tx = lx - mo.x;
-        const ty = ly - mo.y;
+      if (light) {
+        const tx = light[0] - mo.x;
+        const ty = light[1] - mo.y;
         const d = Math.hypot(tx, ty) || 1;
         const a = Math.atan2(ty, tx) + mo.side * (Math.PI / 2 - 0.9 * clamp((d - mo.r) / mo.r, -1, 1));
         mo.vx += (Math.cos(a) * 150 - mo.vx) * dt * 2 + (Math.random() - 0.5) * 900 * dt;
         mo.vy += (Math.sin(a) * 150 - mo.vy) * dt * 2 + (Math.random() - 0.5) * 900 * dt;
-        mo.phase += dt * 30;
+      } else if (fly) {
+        // No light: they flutter on a breeze, out one side and back in the other.
+        mo.vx += (60 - mo.vx) * dt * 0.5 + (Math.random() - 0.5) * 900 * dt;
+        mo.vy += (-10 - mo.vy) * dt * 0.5 + (Math.random() - 0.5) * 900 * dt;
+        if (mo.x < -30) mo.x = W + 30;
+        else if (mo.x > W + 30) mo.x = -30;
+        if (mo.y < -30) mo.y = H + 30;
+        else if (mo.y > H + 30) mo.y = -30;
       } else {
         mo.vx *= Math.exp(-dt * 4);
         mo.vy *= Math.exp(-dt * 4);
       }
+      if (fly) mo.phase += dt * 30;
       mo.x += mo.vx * dt;
       mo.y += mo.vy * dt;
     }
   }
 
-  draw(r: Renderer) {
-    const { cw, ch, lx, ly, time: t } = this;
-    // Lamplight: a bright bulb in a dotted halo.
-    const R = Math.min(this.W, this.H) * 0.3;
-    const flicker = 0.92 + 0.08 * Math.sin(t * 17) * Math.sin(t * 5.3);
-    for (let row = Math.floor((ly - R) / ch); row <= Math.floor((ly + R) / ch); row++) {
-      for (let col = Math.floor((lx - R) / cw); col <= Math.floor((lx + R) / cw); col++) {
-        const dist = Math.hypot((col + 0.5) * cw - lx, (row + 0.5) * ch - ly);
-        if (dist < this.bulbR) {
-          r.putCell(col, row, dist < this.bulbR * 0.5 ? "@" : "*", [255, 250, 232], scale([255, 228, 150], flicker));
+  /** A dotted halo of light, with a bulb at its centre for the lamp. */
+  private glow(r: Renderer, x: number, y: number, R: number, flicker: number, bulb: boolean) {
+    const { cw, ch, bulbR } = this;
+    for (let row = Math.floor((y - R) / ch); row <= Math.floor((y + R) / ch); row++) {
+      for (let col = Math.floor((x - R) / cw); col <= Math.floor((x + R) / cw); col++) {
+        const dist = Math.hypot((col + 0.5) * cw - x, (row + 0.5) * ch - y);
+        if (bulb && dist < bulbR) {
+          r.putCell(col, row, dist < bulbR * 0.5 ? "@" : "*", [255, 250, 232], scale([255, 228, 150], flicker));
           continue;
         }
         const g = (1 - dist / R) ** 2 * flicker;
@@ -490,9 +519,17 @@ export class MothScene implements Scene {
         }
       }
     }
+  }
+
+  draw(r: Renderer) {
+    const { cw, ch, lx, ly, time: t, pointer: p } = this;
+    const R = Math.min(this.W, this.H) * 0.3;
+    const flicker = 0.92 + 0.08 * Math.sin(t * 17) * Math.sin(t * 5.3);
+    if (this.lampOn) this.glow(r, lx, ly, R, flicker, true);
+    if (this.cursorLight && p.active) this.glow(r, p.x, p.y, R * 0.4, flicker, false);
     const fly = this.mode === "fly";
     for (const mo of this.motes) {
-      const near = clamp(1 - Math.hypot(mo.x - lx, mo.y - ly) / R, 0, 1);
+      const near = this.lampOn ? clamp(1 - Math.hypot(mo.x - lx, mo.y - ly) / R, 0, 1) : 0.3;
       r.putCell(Math.floor(mo.x / cw), Math.floor(mo.y / ch), fly && Math.sin(mo.phase) > 0 ? "v" : "^", scale([230, 220, 190], 0.45 + 0.55 * near));
     }
     this.moths.sort((p, q) => p.lift - q.lift || p.L - q.L);
