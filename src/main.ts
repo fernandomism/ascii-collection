@@ -1,7 +1,7 @@
 /**
  * Starts the scene a page asks for on its canvas:
  *   <canvas data-scene="moths" data-mode="crawl" data-look="grey">
- * scene: moths | beetles | ants | leaves | pond | pond-iso · mode (moths): fly | crawl · look: color | grey
+ * scene: moths | moth-swarm | beetles | ants | leaves | pond · mode (moths): fly | crawl · look: color | grey
  */
 import { BugEngine } from "./core/engine";
 import { makeScene } from "./scenes";

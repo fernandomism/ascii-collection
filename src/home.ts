@@ -31,16 +31,16 @@ const pair = (id: string, v: Omit<Version, "id" | "look">): Version[] =>
 const VERSIONS: Version[] = [
   ...pair("moths-fly", { section: "insects", title: "moths · flying", scene: "moths", mode: "fly", about: ABOUT.fly }),
   ...pair("moths-crawl", { section: "insects", title: "moths · crawling", scene: "moths", mode: "crawl", about: ABOUT.crawl }),
+  {
+    id: "moths-swarm", section: "insects", title: "moth swarm", scene: "moth-swarm",
+    about: "Dozens of small, plain moths spiral round a lamp; your cursor is a second light. Click to scatter them.",
+  },
   ...pair("beetles", { section: "insects", title: "beetles", scene: "beetles", about: ABOUT.beetles }),
   ...pair("ants", { section: "insects", title: "ants", scene: "ants", about: ABOUT.ants }),
   { id: "leaves", section: "nature", title: "falling leaves", scene: "leaves", about: "Maple, oak, birch and ginkgo leaves tumbling down in autumn colours." },
   {
     id: "pond", section: "nature", title: "koi pond", scene: "pond",
-    about: "A koi pond seen at an angle. Click the water to ripple it and feed the koi; petals drift down and a dragonfly visits.",
-  },
-  {
-    id: "pond-iso", section: "nature", title: "koi pond · isometric", scene: "pond-iso",
-    about: "Up close at an isometric angle: big koi, pink water lilies, dragonflies and dark fish deep below. Click to feed the koi.",
+    about: "A koi pond seen from a second-floor window: pink water lilies, red and blue dragonflies, small fish deep below. Click to feed the koi.",
   },
 ];
 

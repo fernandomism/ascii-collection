@@ -13,7 +13,6 @@ const FORE = [0.03, 0, 0.05, 0.12, 0.045, 0.3, 0.01, 0.45, -0.03, 0.46, -0.05, 0
 const HIND = [0.01, 0, 0.03, 0.12, 0.02, 0.3, -0.02, 0.44, -0.07, 0.44, -0.11, 0.28, -0.09, 0.08, -0.03, 0];
 
 const THORAX: RGB = [58, 170, 196];
-const RING: RGB = [22, 64, 92];
 const EYE: RGB = [40, 150, 120];
 const MEMBRANE: RGB = [204, 228, 236];
 const VEIN: RGB = [150, 182, 194];
@@ -83,26 +82,26 @@ export class Dragonfly {
   }
 
   /**
-   * `place` maps its position to the screen plus a size factor, how flat it looks there and
-   * (optionally) a turn for the view, for scenes seen at an angle; by default it's drawn as
-   * seen from straight above.
+   * `place` maps its position to the screen plus a size factor and how flat it looks there,
+   * for scenes seen at an angle; by default it's drawn as seen from straight above.
    */
-  draw(r: Renderer, id: number, place: (x: number, y: number) => [number, number, number, number, number?] = (x, y) => [x, y, 1, 1]) {
+  draw(r: Renderer, id: number, place: (x: number, y: number) => [number, number, number, number] = (x, y) => [x, y, 1, 1]) {
     if (this.state === "away") return;
     // Wings beat too fast to follow: they shimmer between full and foreshortened.
     const flap = 0.35 + 0.65 * Math.abs(Math.cos(this.flap));
-    const parts: Part[] = [
-      { k: "seg", x0: -0.05, y0: 0, x1: -0.6, y1: 0, r0: 0.032, r1: 0.018, paint: (u) => ((u * 9) % 1 < 0.22 ? RING : this.body), gloss: 0.8 },
-    ];
+    // Wings first, then the body over their roots, so it stays solid while they beat.
+    const parts: Part[] = [];
     for (const side of SIDES) {
       parts.push({ k: "wing", poly: HIND, x: 0.01, side, sweep: 0.18, flap, paint: wingPaint, ramp: ".:-=" });
       parts.push({ k: "wing", poly: FORE, x: 0.06, side, sweep: -0.1, flap, paint: wingPaint, ramp: ".:-=" });
     }
-    parts.push({ k: "ell", x: 0.04, y: 0, rx: 0.075, ry: 0.05, paint: this.body, gloss: 0.9 });
-    parts.push({ k: "ell", x: 0.13, y: 0, rx: 0.04, ry: 0.06, paint: this.body, gloss: 0.6 });
-    for (const side of SIDES) parts.push({ k: "ell", x: 0.14, y: side * 0.04, rx: 0.036, ry: 0.036, paint: EYE, gloss: 1.2 });
+    const ring: RGB = [this.body[0] * 0.55, this.body[1] * 0.55, this.body[2] * 0.55];
+    parts.push({ k: "seg", x0: -0.04, y0: 0, x1: -0.6, y1: 0, r0: 0.05, r1: 0.032, paint: (u) => ((u * 9) % 1 < 0.2 ? ring : this.body), gloss: 0.8 });
+    parts.push({ k: "ell", x: 0.04, y: 0, rx: 0.09, ry: 0.065, paint: this.body, gloss: 0.9 });
+    parts.push({ k: "ell", x: 0.14, y: 0, rx: 0.045, ry: 0.07, paint: this.body, gloss: 0.6 });
+    for (const side of SIDES) parts.push({ k: "ell", x: 0.15, y: side * 0.045, rx: 0.042, ry: 0.042, paint: EYE, gloss: 1.2 });
     const fig: Figure = { parts, strokes: [] };
-    const [x, y, s, squash, turn = 0] = place(this.x, this.y);
-    r.bug(fig, { x, y, heading: this.heading + turn, L: this.L * s, id, lift: 1, squash });
+    const [x, y, s, squash] = place(this.x, this.y);
+    r.bug(fig, { x, y, heading: this.heading, L: this.L * s, id, lift: 1, squash });
   }
 }

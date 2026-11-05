@@ -23,6 +23,8 @@ export interface FlockStyle {
   beat: number;
   /** Dart away from the cursor. */
   shy: boolean;
+  /** Personal space between members, px (default 14, for one-glyph creatures). */
+  spacing?: number;
 }
 
 interface Member {
@@ -85,7 +87,9 @@ export class Flock {
   }
 
   step(dt: number, W: number, H: number, time: number, pointer?: { x: number; y: number; active: boolean }) {
-    const { cruise, maxSpeed, jitter, beat, shy } = this.style;
+    const { cruise, maxSpeed, jitter, beat, shy, spacing = 14 } = this.style;
+    const near2 = Math.max(60, spacing * 2.5) ** 2;
+    const space2 = spacing * spacing;
     for (const s of this.groups) {
       // The leader drifts like a shark on patrol: a wobbling loop through and out of the scene.
       s.wander = clamp(s.wander + (Math.random() - 0.5) * dt * 3, -1.1, 1.1);
@@ -118,13 +122,13 @@ export class Flock {
           const ex = g.x - o.x;
           const ey = g.y - o.y;
           const d2 = ex * ex + ey * ey;
-          if (d2 > 3600) continue;
+          if (d2 > near2) continue;
           avx += o.vx;
           avy += o.vy;
           n++;
-          if (d2 < 196 && d2 > 1e-6) {
-            ax += (ex / d2) * 2600;
-            ay += (ey / d2) * 2600;
+          if (d2 < space2 && d2 > 1e-6) {
+            ax += (ex / d2) * 13 * space2;
+            ay += (ey / d2) * 13 * space2;
           }
         }
         if (n) {

@@ -235,6 +235,23 @@ function mothFigure(m: Moth, t: number): Figure {
   return { parts, strokes };
 }
 
+/** A lamp: a bright bulb in a dotted halo of light that fades out to radius R. */
+export function lampGlow(r: Renderer, x: number, y: number, R: number, flicker: number, bulbR: number, cw: number, ch: number) {
+  for (let row = Math.floor((y - R) / ch); row <= Math.floor((y + R) / ch); row++) {
+    for (let col = Math.floor((x - R) / cw); col <= Math.floor((x + R) / cw); col++) {
+      const dist = Math.hypot((col + 0.5) * cw - x, (row + 0.5) * ch - y);
+      if (dist < bulbR) {
+        r.putCell(col, row, dist < bulbR * 0.5 ? "@" : "*", [255, 250, 232], scale([255, 228, 150], flicker));
+        continue;
+      }
+      const g = (1 - dist / R) ** 2 * flicker;
+      if (g > 0.04 && hash3(col, row, 7) < 0.55) {
+        r.putCell(col, row, g > 0.25 ? ":" : ".", [210 * g + 20, 165 * g + 16, 90 * g + 12]);
+      }
+    }
+  }
+}
+
 export class MothScene implements Scene {
   time = 0;
   pointer = { x: 0, y: 0, active: false };
@@ -511,31 +528,13 @@ export class MothScene implements Scene {
     }
   }
 
-  /** A dotted halo of light, with a bulb at its centre for the lamp. */
-  private glow(r: Renderer, x: number, y: number, R: number, flicker: number, bulb: boolean) {
-    const { cw, ch, bulbR } = this;
-    for (let row = Math.floor((y - R) / ch); row <= Math.floor((y + R) / ch); row++) {
-      for (let col = Math.floor((x - R) / cw); col <= Math.floor((x + R) / cw); col++) {
-        const dist = Math.hypot((col + 0.5) * cw - x, (row + 0.5) * ch - y);
-        if (bulb && dist < bulbR) {
-          r.putCell(col, row, dist < bulbR * 0.5 ? "@" : "*", [255, 250, 232], scale([255, 228, 150], flicker));
-          continue;
-        }
-        const g = (1 - dist / R) ** 2 * flicker;
-        if (g > 0.04 && hash3(col, row, 7) < 0.55) {
-          r.putCell(col, row, g > 0.25 ? ":" : ".", [210 * g + 20, 165 * g + 16, 90 * g + 12]);
-        }
-      }
-    }
-  }
-
   draw(r: Renderer) {
     const { cw, ch, lx, ly, time: t, pointer: p } = this;
     const R = Math.min(this.W, this.H) * 0.3;
     const flicker = 0.92 + 0.08 * Math.sin(t * 17) * Math.sin(t * 5.3);
-    if (this.lampOn) this.glow(r, lx, ly, R, flicker, true);
+    if (this.lampOn) lampGlow(r, lx, ly, R, flicker, this.bulbR, cw, ch);
     // The cursor light is a second lamp, bulb and all, wherever the mouse is.
-    if (this.cursorLight && p.active) this.glow(r, p.x, p.y, R * 0.8, flicker, true);
+    if (this.cursorLight && p.active) lampGlow(r, p.x, p.y, R * 0.8, flicker, this.bulbR, cw, ch);
     const fly = this.mode === "fly";
     for (const mo of this.motes) {
       const l = this.nearestLight(mo.x, mo.y);

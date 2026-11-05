@@ -2,9 +2,9 @@
 import { AntScene } from "./src/insects/ants";
 import { BeetleScene } from "./src/insects/beetles";
 import { MothScene } from "./src/insects/moths";
+import { MothSwarmScene } from "./src/insects/moth-swarm";
 import { LeavesScene } from "./src/nature/leaves";
 import { PondScene } from "./src/nature/pond";
-import { IsoPondScene } from "./src/nature/pond-iso";
 
 const ok = (cond: unknown, what: string) => {
   if (!cond) throw new Error(`check failed: ${what}`);
@@ -127,7 +127,7 @@ run(pond, 30, () => {
   for (const p of afloat) if (!pond.petals.includes(p)) sank++;
   afloat = now;
   if (pond.petals.length > 14) crowded++;
-  visited ||= pond.dragonfly.state !== "away";
+  visited ||= pond.dragonflies.some((d) => d.state !== "away");
 });
 ok(pond.food.length < 6, "koi ate some of the food");
 ok(landings > 0 && sank > 0, "petals land on the water and later sink");
@@ -139,28 +139,17 @@ const [ux, uy] = pond.view.unproject(300, 400);
 const [sx, sy] = pond.view.project(ux, uy);
 ok(Math.abs(sx - 300) < 0.01 && Math.abs(sy - 400) < 0.01, "a click lands where it was made on the angled water");
 
-// Isometric pond: a click ripples the water and feeds the koi; koi rise to breathe; koi and the
-// deep fish swim out of view and back but never wander off; dragonflies come by.
-const iso = new IsoPondScene();
-iso.resize(W, H, 12, 17);
-ok(iso.koi.length === 4 && iso.deep.length > 0 && iso.pads.some((p) => p.flower), "koi, deep fish and flowering lily pads");
-const [iu, iv] = iso.unproject(500, 380);
-const [ix, iy] = iso.project(iu, iv);
-ok(Math.abs(ix - 500) < 0.01 && Math.abs(iy - 380) < 0.01, "a click lands where it was made on the isometric water");
-iso.click(iso.cx, iso.cy);
-ok(iso.ripples.length === 1 && iso.food.length === 6, "a click on the water ripples it and drops food");
-let breaths = 0;
-let isoVisit = false;
-let wandered = 0;
-run(iso, 30, () => {
-  if (iso.ripples.some((r) => r.strength === 0.3)) breaths++;
-  isoVisit ||= iso.dragonflies.some((d) => d.state !== "away");
-  for (const f of [...iso.koi, ...iso.deep]) if (Math.max(Math.abs(f.x), Math.abs(f.y)) > iso.A + 2 * f.L) wandered++;
-});
-ok(iso.food.length < 6, "koi ate some of the food");
-ok(breaths > 0, "koi rose to breathe");
-ok(wandered === 0, "koi and deep fish never wander off for good");
-ok(isoVisit, "a dragonfly came by");
+// Moth swarm: they stay round the light, and a click scatters the ones nearby.
+const swarm = new MothSwarmScene();
+swarm.resize(W, H, 10, 15);
+run(swarm, 20);
+const lampX = W * swarm.lamp.fx;
+const lampY = H * swarm.lamp.fy;
+ok(swarm.moths.every((m) => Math.hypot(m.x - lampX, m.y - lampY) < Math.min(W, H) * 0.8), "the swarm stays round the lamp");
+const near = swarm.moths.filter((m) => Math.hypot(m.x - lampX, m.y - lampY) < 200);
+swarm.click(lampX, lampY);
+run(swarm, 0.3);
+ok(near.length > 0 && near.every((m) => m.scatterUntil > swarm.time), "a click scatters the moths nearby");
 
 ok(stray < 2, `bugs that wander off-screen come back (strayed ${stray.toFixed(2)} L)`);
 console.log(`ok (furthest off-screen: ${stray.toFixed(2)} body lengths)`);

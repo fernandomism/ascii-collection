@@ -35,6 +35,7 @@ no text, buttons or HUD.
 | --- | --- |
 | `insects/moths-fly-color.html`, `insects/moths-fly-grey.html` | Atlas, luna, polyphemus, death's-head and rosy maple moths circling a lamp; your cursor is a second lamp. Click to move the lamp. |
 | `insects/moths-crawl-color.html`, `insects/moths-crawl-grey.html` | The same moths perched and walking, now and then fluttering off. Click one to make it flash its wings. |
+| `insects/moths-swarm.html` | Dozens of small, plain moths spiralling round a lamp, like the sharks' fish; your cursor is a second light. Click to scatter them. |
 | `insects/beetles-color.html`, `insects/beetles-grey.html` | Flower chafer, goliath, stag, rhinoceros, hercules, jewel beetle and ladybird walking their loops in and out of the scene, with gnat swarms drifting over. Click a beetle to startle it into flight. |
 | `insects/ants-color.html`, `insects/ants-grey.html` | Detailed ants exploring in and out of the scene. Click to drop food; they carry it home along a pheromone trail. |
 
@@ -45,8 +46,7 @@ The grey versions use the sharks' blue-grey with flickering rainbow glyphs.
 | Page | |
 | --- | --- |
 | `nature/leaves.html` | Maple, oak, birch and ginkgo leaves tumbling down an autumn grid. |
-| `nature/pond.html` | A koi pond from above. Click the water to ripple it and scatter food for the koi. Sakura petals fall and ripple the surface, lily pads float, gnats drift and a dragonfly comes by now and then. |
-| `nature/pond-iso.html` | The koi pond up close at an almost isometric angle: big koi, lily pads with pink water lilies drifting on a slow current, small dark fish deep below, two dragonflies, light rippling across the water and a slowly breathing glow. Click the water to ripple it and feed the koi. |
+| `nature/pond.html` | A koi pond seen from a second-floor window. Click the water to ripple it and feed the koi. Sakura petals drift down now and then, lily pads carry pink water lilies, small fish swim deep below, a few flies wander and red and blue dragonflies come by. |
 
 ## Use
 
@@ -63,9 +63,9 @@ falling, koi eat, petals land, the dragonfly visits, and bugs that leave come ba
 ## Layout
 
 ```
-src/core/      engine (loop, resize, input), renderer (supersampled ASCII cells), math, anatomy
-src/insects/   moths, beetles, ants, gnats, dragonfly
-src/nature/    leaves, pond, pond-iso, koi
+src/core/      engine (loop, resize, input), renderer (supersampled ASCII cells), math, anatomy, flock
+src/insects/   moths, moth-swarm, beetles, ants, dragonfly
+src/nature/    leaves, pond, koi
 src/main.ts    starts the scene a page names on its canvas, e.g.
                <canvas data-scene="moths" data-mode="crawl" data-look="grey">
 insects/, nature/   the pages

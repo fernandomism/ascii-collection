@@ -7,7 +7,7 @@
  * Click the water: it ripples and you scatter food, which the koi come up to eat.
  * Now and then a sakura petal drifts down, ripples the surface where it lands,
  * floats a while and sinks. Lily pads float on top, faint schools of small fish
- * swim far below, a few flies wander about and a dragonfly comes by now and then.
+ * swim far below, a few flies wander about and red and blue dragonflies come by now and then.
  */
 import { mix, SIDES } from "../core/anatomy";
 import type { Scene } from "../core/engine";
@@ -81,15 +81,37 @@ const PETAL_PALE: RGB = [255, 200, 218];
 const PETAL_DEEP: RGB = [242, 122, 162];
 const PAD_GREEN: RGB = [64, 136, 64];
 const PAD_RIM: RGB = [40, 96, 46];
-const LILY: RGB = [246, 232, 240];
-const LILY_HEART: RGB = [244, 206, 80];
+const LILY_OUTER: RGB = [236, 112, 164];
+const LILY_INNER: RGB = [252, 196, 220];
+const LILY_HEART: RGB = [250, 210, 90];
+const RED_DRAGONFLY: RGB = [214, 54, 40];
+const BLUE_DRAGONFLY: RGB = [60, 112, 226];
+/** Fish deep below: dark, close to the background. */
+const DEEP_FISH_RGB: RGB = [84, 128, 142];
+const FIN = [0.02, 0, -0.02, 0.14, -0.1, 0.2, -0.08, 0.08, -0.03, 0];
 const FOOD: RGB = [214, 168, 104];
 const DEEP_WATER: RGB = [10, 34, 42];
 
-/** Faint schools far below the koi: one dim dash per fish, like the sharks' fish. */
+/** Loose groups of small fish far below the koi. */
 const DEEP_FISH: FlockStyle = {
-  glyphs: "-~", ink: [96, 162, 172], groups: 4, size: [14, 24], cruise: 40, maxSpeed: 70, jitter: 120, beat: 6, shy: false,
+  glyphs: "-~", ink: [0, 0, 0], groups: 3, size: [5, 9], cruise: 40, maxSpeed: 70, jitter: 120, beat: 6, shy: false, spacing: 45,
 };
+
+/** A small shark-shaped fish seen from above: pointed snout, swept fins, a darker ridge and a forked tail that sways. */
+function deepFishFigure(phase: number, rgb: RGB): Figure {
+  const ridge: RGB = [rgb[0] * 0.65, rgb[1] * 0.65, rgb[2] * 0.65];
+  const parts: Part[] = [];
+  const a = 0.5 * Math.sin(phase);
+  const bx = -0.32;
+  const by = 0.04 * Math.sin(phase + 1);
+  for (const side of SIDES) {
+    parts.push({ k: "seg", x0: bx, y0: by, x1: bx - 0.18 * Math.cos(a) - side * 0.09 * Math.sin(a), y1: by - 0.18 * Math.sin(a) + side * 0.09 * Math.cos(a), r0: 0.035, r1: 0.01, paint: ridge });
+    parts.push({ k: "wing", poly: FIN, x: 0.1, side, sweep: 0.5, flap: 1, paint: ridge });
+  }
+  parts.push({ k: "ell", x: 0.02, y: 0, rx: 0.34, ry: 0.075, paint: (u, v) => (Math.abs(v) < 0.25 && u > -0.6 && u < 0.5 ? ridge : rgb), gloss: 0.3 });
+  parts.push({ k: "seg", x0: 0.28, y0: 0, x1: 0.42, y1: 0, r0: 0.05, r1: 0.01, paint: rgb });
+  return { parts, strokes: [] };
+}
 /** A few lone flies about the water at all times. */
 const FLIES: FlockStyle = {
   glyphs: "+x", ink: [230, 238, 220], groups: 6, size: [1, 1], cruise: 80, maxSpeed: 200, jitter: 700, beat: 40, shy: true,
@@ -144,7 +166,7 @@ interface Pellet extends Food {
 export class PondScene implements Scene {
   time = 0;
   pointer = { x: 0, y: 0, active: false };
-  backdrop: Backdrop = { bg: "#061419", grid: "rgba(120,200,220,0.05)", big: true, shadows: false };
+  backdrop: Backdrop = { bg: "#000", grid: "rgba(255,255,255,0.055)", big: true, shadows: false };
   view = new View();
   koi: Koi[] = [];
   pads: Pad[] = [];
@@ -153,9 +175,11 @@ export class PondScene implements Scene {
   ripples: Ripple[] = [];
   deep = new Flock(DEEP_FISH);
   flies = new Flock(FLIES);
-  dragonfly = new Dragonfly(0);
+  dragonflies: Dragonfly[] = [];
   /** Where the koi swim: the stretch of the pond in view at the near edge, from a little past the far edge. */
   private koiArea: Area = { x: 0, y: 0, w: 0, h: 0 };
+  /** Where the deep fish swim (their flock works from 0, so this is its offset on the pond): the water in view. */
+  private deepArea: Area = { x: 0, y: 0, w: 0, h: 0 };
   private cw = 12;
   private ch = 17;
   private nextPetal = 0;
@@ -165,10 +189,10 @@ export class PondScene implements Scene {
     const first = this.view.W === 0;
     this.view.set(width, height);
     this.koiArea = { x: this.view.Wp / 2 - width / 2, y: this.view.D * 0.15, w: width, h: this.view.D * 0.85 };
+    this.deepArea = { x: this.view.Wp / 2 - width * 0.45, y: this.view.D * 0.3, w: width * 0.9, h: this.view.D * 0.6 };
     this.cw = cw;
     this.ch = ch;
     if (!first) return;
-    const { Wp, D } = this.view;
     const minSide = Math.min(width, height);
     // Somewhere on the water that's on screen.
     const onScreen = (): [number, number] => this.view.unproject(rand(0.05, 0.95) * width, rand(0.08, 0.95) * height);
@@ -186,12 +210,12 @@ export class PondScene implements Scene {
         [x, y] = onScreen();
         if (this.pads.every((p) => Math.hypot(p.x - x, p.y - y) > (p.L + L) * 0.6)) break;
       }
-      this.pads.push({ id: this.nextId++, x, y, L, angle: rand(0, TAU), flower: Math.random() < 0.35 });
+      this.pads.push({ id: this.nextId++, x, y, L, angle: rand(0, TAU), flower: Math.random() < 0.6 });
     }
     for (let i = 0; i < 3; i++) this.dropPetal(true);
-    this.deep.seed(Wp, D);
+    this.deep.seed(this.deepArea.w, this.deepArea.h);
     this.flies.seed(width, height);
-    this.dragonfly = new Dragonfly(minSide * 0.17);
+    this.dragonflies = [new Dragonfly(minSide * 0.17, rand(2, 6), RED_DRAGONFLY), new Dragonfly(minSide * 0.15, rand(9, 15), BLUE_DRAGONFLY)];
   }
 
   click(x: number, y: number) {
@@ -264,18 +288,24 @@ export class PondScene implements Scene {
     }
     this.petals = this.petals.filter((p) => p.sink < 1);
     this.ripples = this.ripples.filter((r) => time - r.born < 1.6 + 1.8 * r.strength);
-    this.deep.step(dt, Wp, D, time);
+    this.deep.step(dt, this.deepArea.w, this.deepArea.h, time);
     this.flies.step(dt, W, H, time, this.pointer);
-    this.dragonfly.step(dt, time, Wp, D);
+    for (const d of this.dragonflies) d.step(dt, time, Wp, D);
   }
 
   draw(r: Renderer) {
     const { cw, ch, time: t, view } = this;
-    // Deepest first: the faint schools, dimmer the farther off they are.
-    this.deep.draw(r, cw, ch, (x, y) => {
-      const [sx, sy, s] = view.project(x, y);
-      return [sx, sy, 0.3 + 0.7 * s];
-    });
+    // Deepest first: the small fish far below, darker the farther off they are.
+    let id = 3000;
+    const minSide = Math.min(view.W, view.H);
+    for (const g of this.deep.groups) {
+      for (const m of g.members) {
+        const [x, y, s, q] = view.project(m.x + this.deepArea.x, m.y + this.deepArea.y);
+        const k = 0.5 + 0.5 * s;
+        const fig = deepFishFigure(m.phase, [DEEP_FISH_RGB[0] * k, DEEP_FISH_RGB[1] * k, DEEP_FISH_RGB[2] * k]);
+        r.bug(fig, { x, y, heading: Math.atan2(m.vy, m.vx), L: minSide * 0.15 * (0.7 + 0.3 * m.depth) * s, id: id++, squash: q });
+      }
+    }
 
     this.koi.sort((a, b) => a.y - b.y);
     for (const k of this.koi) {
@@ -312,11 +342,18 @@ export class PondScene implements Scene {
     for (const p of this.pads) {
       const parts: Part[] = SIDES.map((side): Part => ({ k: "wing", poly: PAD, x: 0, side, sweep: 0, flap: 1, paint: padPaint, ramp: WING }));
       if (p.flower) {
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * TAU + p.id;
-          parts.push({ k: "ell", x: 0.12 + Math.cos(a) * 0.07, y: 0.1 + Math.sin(a) * 0.07, rx: 0.08, ry: 0.035, a, paint: LILY, gloss: 0.4 });
+        // A pink water lily: an outer ring, an inner ring and a golden heart.
+        const fx = 0.1;
+        const fy = 0.08;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + p.id;
+          parts.push({ k: "ell", x: fx + Math.cos(a) * 0.13, y: fy + Math.sin(a) * 0.13, rx: 0.14, ry: 0.055, a, paint: LILY_OUTER, gloss: 0.5 });
         }
-        parts.push({ k: "ell", x: 0.12, y: 0.1, rx: 0.035, ry: 0.035, paint: LILY_HEART, gloss: 0.6 });
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU + p.id + 0.4;
+          parts.push({ k: "ell", x: fx + Math.cos(a) * 0.07, y: fy + Math.sin(a) * 0.07, rx: 0.09, ry: 0.04, a, paint: LILY_INNER, gloss: 0.6 });
+        }
+        parts.push({ k: "ell", x: fx, y: fy, rx: 0.05, ry: 0.05, paint: LILY_HEART, gloss: 0.7 });
       }
       const [x, y, s, q] = view.project(p.x, p.y);
       const fig: Figure = { parts, strokes: [] };
@@ -338,11 +375,13 @@ export class PondScene implements Scene {
       });
     }
 
-    // The dragonfly hovers a little above the water.
-    this.dragonfly.draw(r, 999, (x, y) => {
-      const [sx, sy, s, q] = view.project(x, y);
-      return [sx, sy - 80 * s, s, q];
-    });
+    // Dragonflies hover a little above the water.
+    this.dragonflies.forEach((d, i) =>
+      d.draw(r, 990 + i, (x, y) => {
+        const [sx, sy, s, q] = view.project(x, y);
+        return [sx, sy - 80 * s, s, q];
+      }),
+    );
     this.flies.draw(r, cw, ch);
   }
 

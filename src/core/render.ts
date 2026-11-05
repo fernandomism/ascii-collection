@@ -115,10 +115,6 @@ export interface Backdrop {
   big?: boolean;
   /** Off on a coloured page, where shadow cells read as dark boxes. */
   shadows?: boolean;
-  /** Paints the page instead of the flat bg colour (gradients), baked once per resize under the grid. */
-  paint?: (g: CanvasRenderingContext2D, W: number, H: number) => void;
-  /** Light laid over the page every frame, under the cells (a slow glow, say). */
-  light?: (g: CanvasRenderingContext2D, W: number, H: number, t: number) => void;
 }
 
 export class Renderer {
@@ -198,7 +194,6 @@ export class Renderer {
   }
 
   /** Bake the grid and the scene's static ground glyphs into the backdrop. */
-  /** Bake the page, grid and the scene's static ground glyphs into the backdrop. */
   paintGround(ground?: (col: number, row: number) => [string, RGB] | null) {
     const g = this.bg.getContext("2d");
     if (!g) return;
@@ -206,7 +201,6 @@ export class Renderer {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = this.backdrop.bg;
     g.fillRect(0, 0, W, H);
-    this.backdrop.paint?.(g, W, H);
     paintGrid(g, W, H, cw, ch, dpr, this.backdrop.grid);
     if (!ground) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -487,11 +481,6 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(this.bg, 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (this.backdrop.light) {
-      ctx.save();
-      this.backdrop.light(ctx, this.width, this.height, this.time);
-      ctx.restore();
-    }
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     const shadows = this.backdrop.shadows !== false;
     for (let i = 0; i < mode.length; i++) {
